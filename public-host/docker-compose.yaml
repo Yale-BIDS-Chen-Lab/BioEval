@@ -1,0 +1,58 @@
+services:
+  db:
+    image: docker.io/library/postgres
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: project
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d project"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+    ports:
+      - "4001:4000"
+    environment:
+      DATABASE_URL: postgresql://user:password@db:5432/project
+      # FRONTEND_URL: http://localhost:3000
+      MINIO_ROOT_USER: "minio-root-user"
+      MINIO_ROOT_PASSWORD: "minio-root-password"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ./packages/backend
+          target: /app
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./packages/backend/package.json
+
+  migrate:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://user:password@db:5432/project
+      MINIO_ROOT_USER: "minio-root-user"
+      MINIO_ROOT_PASSWORD: "minio-root-password"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "npx drizzle-kit push"
+
+volumes:
+  pg_data:
+    

@@ -1,0 +1,21 @@
+{
+  "name": "monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "",
+  "workspaces": [
+    "packages/frontend",
+    "packages/backend"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n 'npm run dev:frontend' 'npm run dev:backend'",
+    "dev:frontend": "npm --workspace packages/frontend run dev",
+    "dev:backend": "npm --workspace packages/backend run dev"
+  },
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}

@@ -1,0 +1,27 @@
+# GPU override — apply on top of docker-compose.yml when running on Linux with NVIDIA GPU.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose-gpu.yml up --build
+#
+# Requirements:
+#   https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+
+services:
+  inference:
+    runtime: nvidia
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+
+  # Smoke-test that confirms the NVIDIA runtime and driver are working correctly.
+  cuda:
+    image: nvidia/cuda:12.2.0-runtime-ubuntu22.04
+    command: nvidia-smi
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

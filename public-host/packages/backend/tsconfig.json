@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    // see https://www.totaltypescript.com/tsconfig-cheat-sheet
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "target": "es2022",
+    "moduleDetection": "force",
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+
+    // strictness
+    "strict": true,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
+    "exactOptionalPropertyTypes": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    // "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // transpiling
+    "module": "preserve",
+    "noEmit": true,
+    "rootDir": "src",
+    // "outDir": "dist",
+
+    "lib": ["es2022"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules"]
+}

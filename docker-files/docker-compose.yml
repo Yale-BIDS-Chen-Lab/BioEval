@@ -1,0 +1,194 @@
+services:
+  # Runs DB migrations and seeds initial data (tables + MinIO buckets must be ready first).
+  migrate:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
+    command: sh -c "npx drizzle-kit push --force && npx ts-node scripts/seed.ts"
+
+  # https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.10.0/user-guide.html
+  inference:
+    build:
+      context: ../inference-service
+      dockerfile: Dockerfile
+    tty: true  # keeps tqdm progress bars from collapsing
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      PYTHONUNBUFFERED: 1
+      HF_HOME: /app/.cache/huggingface
+    volumes:
+      - hf_cache:/app/.cache/huggingface
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ../inference-service
+          target: /app
+          ignore:
+            - .venv/
+        - action: rebuild
+          path: ./uv.lock
+  
+
+  # TODO: nginx
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      RABBITMQ_HOST: rabbitmq
+      FRONTEND_URL: ${FRONTEND_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ../backend
+          target: /app
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ../backend/package.json
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_BACKEND_URL: ${VITE_BACKEND_URL}
+    depends_on:
+      backend:
+        condition: service_started
+    # Volume mount is required for TanStack Router's route-file generation to work correctly.
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+
+  # https://github.com/docker-library/rabbitmq/issues/106
+  rabbitmq:
+    image: docker.io/library/rabbitmq:3-management
+    hostname: my-rabbitmq
+    # ports:
+    #   - "5672:5672" # amqp
+    #   - "15672:15672" # management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/conf.d/99-custom.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    # Fix for Erlang cookie permissions inside the container (see rabbitmq/rabbitmq-docker#106)
+    command:
+      [
+        "bash",
+        "-c",
+        "chmod 400 /var/lib/rabbitmq/.erlang.cookie; rabbitmq-server",
+      ]
+
+  db:
+    image: docker.io/library/postgres:17
+    restart: always
+    # ports:
+    #   - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - 9000:9000
+      - 9001:9001
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: server /data --console-address :9001
+
+  # Idempotent bucket initialisation: creates dataset/inference/evaluation buckets if they don't exist.
+  createbuckets:
+    image: minio/mc
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        /usr/bin/mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
+
+        for bucket in dataset inference evaluation; do
+          if /usr/bin/mc ls myminio/$$bucket >/dev/null 2>&1; then
+            echo 'bucket already exists:' $$bucket;
+          else
+            echo 'creating bucket:' $$bucket;
+            /usr/bin/mc mb myminio/$$bucket;
+            /usr/bin/mc policy set public myminio/$$bucket;
+          fi
+        done;
+
+        exit 0;
+      "
+
+volumes:
+  pg_data:
+  minio_data:
+  hf_cache:
+  rabbitmq_data:

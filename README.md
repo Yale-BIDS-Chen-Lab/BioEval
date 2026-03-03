@@ -19,8 +19,8 @@ Supports inference via **Azure OpenAI** and **HuggingFace** (local GPU), with 12
 ## Quick Start
 
 ```bash
-git clone https://github.com/xuguang-ai/medreporter-project.git
-cd medreporter-project/docker-files
+git clone https://github.com/Yale-BIDS-Chen-Lab/BioEval.git
+cd BioEval/docker-files
 cp .env.example .env
 docker compose up --build
 ```

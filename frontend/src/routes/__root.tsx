@@ -7,7 +7,7 @@ const queryClient = new QueryClient();
 export const Route = createRootRoute({
   component: () => (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+      <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
         <div className="h-screen w-screen overflow-x-hidden">
           <Outlet />
         </div>

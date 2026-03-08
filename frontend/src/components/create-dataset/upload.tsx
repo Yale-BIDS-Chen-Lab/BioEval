@@ -17,7 +17,7 @@ function UploadPrompt({ fileInput, onFile }) {
       <input
         ref={fileInput}
         type="file"
-        accept=".csv,.json,.parquet,.xlsx"
+        accept=".csv,.json,.xlsx"
         className="hidden"
         onChange={onFile}
       />
@@ -47,9 +47,23 @@ function UploadPrompt({ fileInput, onFile }) {
           </div>
         </TooltipTrigger>
         <TooltipContent>
-          <p>.csv, .json, .parquet, .xlsx</p>
+          <p>.csv, .json, .xlsx</p>
         </TooltipContent>
       </Tooltip>
+
+      <div className="text-muted-foreground max-w-md text-center text-xs leading-relaxed">
+        <p>
+          Accepted formats: <span className="font-medium">.csv</span>,{" "}
+          <span className="font-medium">.json</span>,{" "}
+          <span className="font-medium">.xlsx</span>
+        </p>
+        <p className="mt-1">
+          File must contain three columns:{" "}
+          <code className="bg-muted rounded px-1 py-0.5">id</code>,{" "}
+          <code className="bg-muted rounded px-1 py-0.5">input_raw</code>,{" "}
+          <code className="bg-muted rounded px-1 py-0.5">reference</code>
+        </p>
+      </div>
     </div>
   );
 }

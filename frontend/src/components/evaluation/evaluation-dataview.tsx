@@ -1,7 +1,14 @@
-import { Check, Download, Loader2, X, SearchIcon } from "lucide-react";
+import { Check, Download, Loader2, X, SearchIcon, Plus, Filter } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import { axios } from "@/lib/axios";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -255,6 +262,13 @@ export function OutputCell({
   );
 }
 
+type FilterCondition = {
+  id: string;
+  metric: string;
+  operator: ">" | "<" | ">=" | "<=" | "=" | "!=";
+  value: number;
+};
+
 export function DataView({
   data,
   inferenceId,
@@ -265,6 +279,53 @@ export function DataView({
   taskId?: string;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterConditions, setFilterConditions] = useState<FilterCondition[]>([]);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+
+  const metricKeys = useMemo(() => {
+    if (!data.length) return [] as string[];
+    return data[0].metrics.map((m: any) => m.key);
+  }, [data]);
+
+  const ops: Record<string, (a: number, b: number) => boolean> = {
+    ">": (a, b) => a > b,
+    "<": (a, b) => a < b,
+    ">=": (a, b) => a >= b,
+    "<=": (a, b) => a <= b,
+    "=": (a, b) => a === b,
+    "!=": (a, b) => a !== b,
+  };
+
+  const filteredData = useMemo(() => {
+    if (filterConditions.length === 0) return data;
+    return data.filter((row) =>
+      filterConditions.every((cond) => {
+        const metric = row.metrics?.find((m: any) => m.key === cond.metric);
+        const num = typeof metric?.value === "number" ? metric.value : parseFloat(metric?.value);
+        if (isNaN(num)) return false;
+        const fn = ops[cond.operator];
+        return fn ? fn(num, cond.value) : false;
+      }),
+    );
+  }, [data, filterConditions]);
+
+  const addFilter = () => {
+    setFilterConditions((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), metric: metricKeys[0] ?? "", operator: ">", value: 0 },
+    ]);
+    setShowFilterPanel(true);
+  };
+
+  const removeFilter = (id: string) => {
+    setFilterConditions((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  const updateFilter = (id: string, field: keyof FilterCondition, value: string | number) => {
+    setFilterConditions((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, [field]: value } : c)),
+    );
+  };
 
   const { data: highlights = {} } = useQuery({
     queryKey: ["inference-highlights", inferenceId],
@@ -286,11 +347,6 @@ export function DataView({
     a.download = "export.json";
     a.click();
   };
-
-  const metricKeys = useMemo(() => {
-    if (!data.length) return [] as string[];
-    return data[0].metrics.map((m: any) => m.key);
-  }, [data]);
 
   const metricColumns = useMemo<ColumnDef<any>[]>(
     () =>
@@ -454,30 +510,121 @@ export function DataView({
 
   return (
     <>
-      <div className="flex h-14 w-full flex-shrink-0 flex-row items-center justify-between border-b px-4">
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <SearchIcon className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-            <Input
-              placeholder="Search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-8 w-80 border-0 pl-10"
-            />
+      <div className="flex flex-col flex-shrink-0 border-b">
+        <div className="flex h-14 w-full flex-row items-center justify-between px-4">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <SearchIcon className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+              <Input
+                placeholder="Search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-8 w-80 border-0 pl-10"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {metricKeys.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={addFilter}
+              >
+                <Filter className="h-4 w-4" />
+                Filter by metrics
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="cursor-pointer"
+              onClick={download}
+            >
+              <Download className="h-4 w-4" />
+            </Button>
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="cursor-pointer"
-          onClick={download}
-        >
-          <Download className="h-4 w-4" />
-        </Button>
+
+        {(filterConditions.length > 0 || showFilterPanel) && (
+          <div className="border-t bg-muted/30 px-4 py-3">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-semibold">Conditions (all must match):</span>
+              <Button variant="ghost" size="sm" onClick={addFilter} className="h-7 gap-1">
+                <Plus className="h-3 w-3" />
+                Add
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {filterConditions.map((cond) => (
+                <div
+                  key={cond.id}
+                  className="flex flex-wrap items-center gap-2 rounded-md bg-background border px-3 py-2"
+                >
+                  <Select
+                    value={cond.metric}
+                    onValueChange={(v) => updateFilter(cond.id, "metric", v)}
+                  >
+                    <SelectTrigger className="h-8 w-[160px]">
+                      <SelectValue placeholder="Metric" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {metricKeys.map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {m}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={cond.operator}
+                    onValueChange={(v) =>
+                      updateFilter(cond.id, "operator", v as FilterCondition["operator"])
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-[70px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value=">">&gt;</SelectItem>
+                      <SelectItem value="<">&lt;</SelectItem>
+                      <SelectItem value=">=">&gt;=</SelectItem>
+                      <SelectItem value="<=">&lt;=</SelectItem>
+                      <SelectItem value="=">=</SelectItem>
+                      <SelectItem value="!=">≠</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number"
+                    step="any"
+                    className="h-8 w-24 font-mono"
+                    value={cond.value}
+                    onChange={(e) =>
+                      updateFilter(cond.id, "value", parseFloat(e.target.value) || 0)
+                    }
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={() => removeFilter(cond.id)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            {filterConditions.length > 0 && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Showing {filteredData.length} of {data.length} rows
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <DataTable
-        data={data}
+        data={filteredData}
         columns={columns}
         globalFilter={searchQuery}
         onGlobalFilterChange={setSearchQuery}

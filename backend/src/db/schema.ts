@@ -186,6 +186,7 @@ export const inference = pgTable(
     isFavorite: boolean().notNull().default(false),
     totalExamples: integer(), // total number of examples to process
     processedExamples: integer(), // number of examples processed so far
+    createdAt: timestamp({ mode: "string" }).notNull().defaultNow(),
   },
   (table) => [
     foreignKey({

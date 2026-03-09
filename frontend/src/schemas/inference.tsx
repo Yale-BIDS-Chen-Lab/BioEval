@@ -35,6 +35,7 @@ export const inferenceSchema = z.object({
   providerId: z.string().nonempty(),
   status: z.enum(["pending", "processing", "done", "failed", "canceled"]),
   isFavorite: z.boolean().optional(),
+  createdAt: z.string().nullable().optional(),
 });
 
 export type Inference = z.infer<typeof inferenceSchema>;

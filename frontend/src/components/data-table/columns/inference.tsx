@@ -10,6 +10,20 @@ import { toast } from "sonner";
 import { Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
+function formatCreatedAt(value: string | null | undefined) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 export const columns: ColumnDef<Inference>[] = [
   {
     id: "select",
@@ -84,6 +98,20 @@ export const columns: ColumnDef<Inference>[] = [
     header: () => null,
     cell: () => null,
     enableSorting: true,
+    enableHiding: false,
+  },
+  {
+    accessorKey: "createdAt",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Created" />
+    ),
+    cell: ({ row }) => {
+      return (
+        <div className="min-w-[170px] whitespace-nowrap">
+          {formatCreatedAt(row.original.createdAt)}
+        </div>
+      );
+    },
     enableHiding: false,
   },
   {

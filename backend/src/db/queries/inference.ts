@@ -2,13 +2,53 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "..";
 import { dataset, inference, NewInference, provider, task } from "../schema";
 
+let inferenceHasCreatedAtColumn: boolean | null = null;
+
 export async function createInference(newProject: NewInference) {
   return db.insert(inference).values(newProject);
 }
 
 // FIXME: optimize query
 export async function getProjectInferences(projectId: string) {
-  return db
+  if (inferenceHasCreatedAtColumn !== false) {
+    try {
+      const rows = await db
+        .select({
+          inferenceId: inference.inferenceId,
+          model: inference.model,
+          providerId: inference.providerId,
+          status: inference.status,
+          task: task.name,
+          taskId: task.id,
+          dataset: dataset.name,
+          isFavorite: inference.isFavorite,
+          totalExamples: inference.totalExamples,
+          processedExamples: inference.processedExamples,
+          createdAt: inference.createdAt,
+        })
+        .from(inference)
+        .innerJoin(task, eq(task.id, inference.taskId))
+        .innerJoin(dataset, eq(dataset.datasetId, inference.datasetId))
+        .where(eq(inference.projectId, projectId))
+        .orderBy(inference.id);
+
+      inferenceHasCreatedAtColumn = true;
+      return rows;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      const missingCreatedAtColumn =
+        /column .*createdAt.* does not exist/i.test(message) ||
+        /column .*created_at.* does not exist/i.test(message);
+
+      if (!missingCreatedAtColumn) {
+        throw error;
+      }
+
+      inferenceHasCreatedAtColumn = false;
+    }
+  }
+
+  const rows = await db
     .select({
       inferenceId: inference.inferenceId,
       model: inference.model,
@@ -26,6 +66,8 @@ export async function getProjectInferences(projectId: string) {
     .innerJoin(dataset, eq(dataset.datasetId, inference.datasetId))
     .where(eq(inference.projectId, projectId))
     .orderBy(inference.id);
+
+  return rows.map((row) => ({ ...row, createdAt: null as string | null }));
 }
 
 export async function getCompletedInferences(projectId: string) {

@@ -2,12 +2,16 @@
 
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChartColumn, Info, Table2Icon, AlertTriangle } from "lucide-react";
+import { ChartColumn, Info, Table2Icon, AlertTriangle, ArrowRight } from "lucide-react";
 import { DataView } from "@/components/inference/inference-dataview";
 import { useQuery } from "@tanstack/react-query";
 import { axios } from "@/lib/axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Container } from "@/components/create-evaluation/container";
+import { Plus } from "lucide-react";
 
 export const Route = createFileRoute(
   "/_authed/dashboard/project/$projectId/inference/$inferenceId/",
@@ -110,6 +114,30 @@ export function RouteComponent() {
             </CardContent>
           </Card>
         )}
+
+        <div className="mt-4 flex flex-col gap-2">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button className="w-full gap-2 cursor-pointer">
+                <Plus className="h-4 w-4" />
+                New Evaluation
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl w-full">
+              <Container projectId={projectId} inferenceId={inferenceId} />
+            </DialogContent>
+          </Dialog>
+
+          <Link
+            from={Route.fullPath}
+            to="./evaluation"
+            className="hover:bg-muted flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition"
+          >
+            <ChartColumn className="h-4 w-4" />
+            View Evaluations
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
       <div className="col-span-3 flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
         <div className="border-b px-4 py-2">

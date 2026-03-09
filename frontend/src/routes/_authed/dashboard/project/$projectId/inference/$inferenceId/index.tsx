@@ -1,8 +1,8 @@
 "use client";
 
-import { createFileRoute, Link, useParams } from "@tanstack/react-router";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChartColumn, Info, Table2Icon, AlertTriangle, ArrowRight } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ChartColumn, Table2Icon, AlertTriangle, ArrowRight } from "lucide-react";
 import { DataView } from "@/components/inference/inference-dataview";
 import { useQuery } from "@tanstack/react-query";
 import { axios } from "@/lib/axios";
@@ -31,11 +31,12 @@ export function RouteComponent() {
       return data;
     },
   });
+  const datasetExampleCount =
+    data?.meta?.totalExamples ?? data?.records?.length ?? 0;
 
   return (
     <div className="grid h-full w-full grid-cols-4 overflow-hidden bg-zinc-50 dark:bg-zinc-950/30">
       <div className="col-span-1 border-r px-6 py-4">
-        {/* <p className="text-base">Inference {inferenceId}</p> */}
         <p className="mb-6 text-xl font-semibold tracking-tight">Inference</p>
 
         {data?.meta && (
@@ -71,6 +72,10 @@ export function RouteComponent() {
                 <span className="truncate font-mono text-xs">
                   {data.meta.dataset?.name}
                 </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-mono text-xs">Examples</span>
+                <span className="font-mono text-xs">{datasetExampleCount}</span>
               </div>
               <div className="flex justify-between">
                 <span className="font-mono text-xs">Task</span>
@@ -111,6 +116,15 @@ export function RouteComponent() {
                     </div>
                   </div>
                 )}
+
+              <div className="pt-2">
+                <div className="mb-1 font-mono text-xs font-semibold">
+                  Prompt
+                </div>
+                <div className="max-h-40 overflow-auto rounded-md border bg-muted/40 p-2 font-mono text-xs whitespace-pre-wrap break-words">
+                  {data.meta?.prompt ?? "—"}
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}

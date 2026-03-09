@@ -1,5 +1,4 @@
 import { DataView } from "@/components/evaluation/evaluation-dataview";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { axios } from "@/lib/axios";
 import { useQuery } from "@tanstack/react-query";
@@ -16,22 +15,13 @@ export const Route = createFileRoute(
   component: RouteComponent,
 });
 
-export function formatParamValue(v: unknown): string {
-  if (v === null || v === undefined) return "—";
-  if (typeof v === "boolean") return v ? "true" : "false";
-  if (typeof v === "number") return Number.isFinite(v) ? String(v) : "—";
-  if (Array.isArray(v)) return v.map((x) => String(x)).join(", ");
-  if (typeof v === "object") return JSON.stringify(v); // nested objects
-  return String(v);
-}
-
 function RouteComponent() {
   const navigate = useNavigate();
 
   const { evaluationId, inferenceId } = useParams({
     from: "/_authed/dashboard/project/$projectId/inference/$inferenceId/evaluation/$evaluationId",
   });
-  const { isPending, isError, data, error } = useQuery({
+  const { data } = useQuery({
     queryKey: ["evaluation-dataview"],
     queryFn: async () => {
       const response = await axios.get("api/evaluation/dataview", {
@@ -43,6 +33,11 @@ function RouteComponent() {
       return response.data;
     },
   });
+  const datasetExampleCount =
+    data?.meta?.totalExamples ??
+    data?.meta?.processedExamples ??
+    data?.records?.length ??
+    0;
 
   return (
     <div className="grid h-full w-full grid-cols-4 overflow-hidden bg-zinc-50 dark:bg-zinc-950/30">
@@ -92,50 +87,15 @@ function RouteComponent() {
                 </span>
               </div>
               <div className="flex justify-between">
+                <span className="font-mono text-xs">Examples</span>
+                <span className="font-mono text-xs">{datasetExampleCount}</span>
+              </div>
+              <div className="flex justify-between">
                 <span className="font-mono text-xs">Task</span>
                 <span className="font-mono text-xs">
                   {data.meta.task?.name}
                 </span>
               </div>
-              {/* 
-              {data.meta.parameters && (
-                <div className="pt-2">
-                  <div className="mb-1 font-mono text-xs font-semibold">
-                    Parameters
-                  </div>
-                  <pre className="bg-muted max-h-48 overflow-auto rounded p-2 font-mono text-xs leading-4">
-                    {JSON.stringify(data.meta.parameters, null, 2)}
-                  </pre>
-                </div>
-              )} */}
-              {/* {data.meta.parameters &&
-                Object.keys(data.meta.parameters).length > 0 && (
-                  <div className="pt-2">
-                    <div className="mb-1 font-mono text-xs font-semibold">
-                      Parameters
-                    </div>
-                    <div className="space-y-1">
-                      {Object.entries(data.meta.parameters).map(
-                        ([key, val]) => (
-                          <div
-                            key={key}
-                            className="flex items-center justify-between"
-                          >
-                            <span className="text-muted-foreground font-mono text-xs">
-                              {key}
-                            </span>
-                            <span
-                              className="max-w-[65%] truncate font-mono text-xs"
-                              title={formatParamValue(val)}
-                            >
-                              {formatParamValue(val)}
-                            </span>
-                          </div>
-                        ),
-                      )}
-                    </div>
-                  </div>
-                )} */}
               {Array.isArray(data?.meta?.parameters) &&
                 data.meta.parameters.length > 0 && (
                   <div className="pt-2">
@@ -168,6 +128,14 @@ function RouteComponent() {
                     </div>
                   </div>
                 )}
+              <div className="pt-2">
+                <div className="mb-1 font-mono text-xs font-semibold">
+                  Prompt
+                </div>
+                <div className="max-h-40 overflow-auto rounded-md border bg-muted/40 p-2 font-mono text-xs whitespace-pre-wrap break-words">
+                  {data.meta?.prompt ?? "—"}
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}

@@ -77,6 +77,8 @@ export async function getEvaluationObject(
       taskId: task.id,
       taskName: task.name,
       parameters: inference.parameters,
+      totalExamples: inference.totalExamples,
+      processedExamples: inference.processedExamples,
     })
     .from(evaluation)
     .innerJoin(inference, eq(inference.inferenceId, evaluation.inferenceId))

@@ -101,7 +101,6 @@ router.post(
             });
           }
 
-          console.log("validating", argument.value, "against", param.schema);
           const ajv = new Ajv2020();
           const validate = ajv.compile(param.schema);
           const valid = validate(argument.value);
@@ -246,6 +245,7 @@ router.get(
         status: inference.status,
         dataset: { id: inference.datasetId, name: inference.datasetName },
         task: { id: inference.taskId, name: inference.taskName },
+        prompt: inference.prompt,
         parameters: inference.parameters,
         totalExamples: inference.totalExamples,
         processedExamples: inference.processedExamples,
@@ -281,7 +281,10 @@ router.get(
         status: inf.status,
         dataset: { id: inf.datasetId, name: inf.datasetName },
         task: { id: inf.taskId, name: inf.taskName },
+        prompt: inf.prompt,
         parameters: inf.parameters,
+        totalExamples: inf.totalExamples,
+        processedExamples: inf.processedExamples,
       };
 
       return res.json({ success: true, meta });

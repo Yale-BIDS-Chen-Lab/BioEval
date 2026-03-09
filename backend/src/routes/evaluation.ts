@@ -76,7 +76,6 @@ router.post(
             });
           }
 
-          console.log("validating", argument.value, "against", param.schema);
           const ajv = new Ajv();
           const validate = ajv.compile(param.schema);
           const valid = validate(argument.value);
@@ -280,7 +279,10 @@ router.get(
         status: evaluation.status,
         dataset: { id: evaluation.datasetId, name: evaluation.datasetName },
         task: { id: evaluation.taskId, name: evaluation.taskName },
+        prompt: evaluation.prompt,
         parameters: evaluation.parameters,
+        totalExamples: evaluation.totalExamples,
+        processedExamples: evaluation.processedExamples,
       };
 
       return res.json({ success: true, records, aggregate, meta });

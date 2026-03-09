@@ -2,6 +2,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "..";
 import { dataset, evaluation, inference, NewEvaluation, provider, task } from "../schema";
 
+let evaluationHasCreatedAtColumn: boolean | null = null;
+
 export async function createEvaluation(newEvaluation: NewEvaluation) {
   return db.insert(evaluation).values(newEvaluation);
 }
@@ -39,7 +41,37 @@ export async function getInferenceEvaluations(
   inferenceId: string,
   userId: string
 ) {
-  return await db
+  if (evaluationHasCreatedAtColumn !== false) {
+    try {
+      const rows = await db
+        .select({
+          evaluationId: evaluation.evaluationId,
+          status: evaluation.status,
+          metrics: evaluation.metrics,
+          createdAt: evaluation.createdAt,
+        })
+        .from(evaluation)
+        .where(
+          and(
+            eq(evaluation.inferenceId, inferenceId),
+            eq(evaluation.userId, userId)
+          )
+        );
+      evaluationHasCreatedAtColumn = true;
+      return rows;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      const missingCreatedAtColumn =
+        /column .*createdAt.* does not exist/i.test(message) ||
+        /column .*created_at.* does not exist/i.test(message);
+      if (!missingCreatedAtColumn) {
+        throw error;
+      }
+      evaluationHasCreatedAtColumn = false;
+    }
+  }
+
+  const rows = await db
     .select({
       evaluationId: evaluation.evaluationId,
       status: evaluation.status,
@@ -52,6 +84,8 @@ export async function getInferenceEvaluations(
         eq(evaluation.userId, userId)
       )
     );
+
+  return rows.map((row) => ({ ...row, createdAt: null as string | null }));
 }
 
 export async function getEvaluationObject(

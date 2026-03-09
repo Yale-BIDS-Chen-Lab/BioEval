@@ -230,6 +230,7 @@ export const evaluation = pgTable(
     inferenceId: text().notNull(),
     userId: text().notNull(),
     projectId: text().notNull(),
+    createdAt: timestamp({ mode: "string" }).notNull().defaultNow(),
   },
   (table) => [
     foreignKey({

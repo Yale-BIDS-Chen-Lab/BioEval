@@ -4,12 +4,33 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { type ColumnDef } from "@tanstack/react-table";
 import { DataTableColumnHeader } from "../data-table-column-header";
 import { DataTableRowActions } from "../data-table-row-actions";
-import { statuses, type Inference } from "@/schemas/inference";
+import { statuses } from "@/schemas/inference";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { useNavigate, useParams } from "@tanstack/react-router";
 
-export const columns: ColumnDef<Inference>[] = [
+type EvaluationRow = {
+  evaluationId: string;
+  status: "pending" | "processing" | "done" | "failed" | "canceled";
+  metrics: string[];
+  createdAt?: string | null;
+};
+
+function formatCreatedAt(value: string | null | undefined) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+export const columns: ColumnDef<EvaluationRow>[] = [
   {
     id: "select",
     header: ({ table }) => (
@@ -60,6 +81,19 @@ export const columns: ColumnDef<Inference>[] = [
         </div>
       );
     },
+    enableSorting: false,
+    enableHiding: false,
+  },
+  {
+    accessorKey: "createdAt",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Created" />
+    ),
+    cell: ({ row }) => (
+      <div className="min-w-[170px] whitespace-nowrap">
+        {formatCreatedAt(row.original.createdAt)}
+      </div>
+    ),
     enableSorting: false,
     enableHiding: false,
   },

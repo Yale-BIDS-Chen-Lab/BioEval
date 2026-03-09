@@ -31,7 +31,7 @@ export function DataView({
   modelNames?: string[];
 }) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);
+  const [selectedMetrics, setSelectedMetrics] = useState<string[]>(commonMetrics);
   const [filterConditions, setFilterConditions] = useState<FilterCondition[]>([]);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
 
@@ -278,27 +278,30 @@ export function DataView({
 
           {commonMetrics.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Show metrics:</span>
-              <div className="flex gap-2 flex-wrap">
-                {commonMetrics.map((metric) => (
-                  <button
-                    key={metric}
-                    onClick={() => {
-                      setSelectedMetrics((prev) =>
-                        prev.includes(metric)
-                          ? prev.filter((m) => m !== metric)
-                          : [...prev, metric]
-                      );
-                    }}
-                    className={`rounded px-2 py-1 text-xs font-mono transition-colors ${
-                      selectedMetrics.includes(metric)
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700"
-                    }`}
-                  >
-                    {formatMetricName(metric)}
-                  </button>
-                ))}
+              <span className="text-xs font-medium">Metrics:</span>
+              <div className="flex gap-1.5 flex-wrap">
+                {commonMetrics.map((metric) => {
+                  const active = selectedMetrics.includes(metric);
+                  return (
+                    <button
+                      key={metric}
+                      onClick={() => {
+                        setSelectedMetrics((prev) =>
+                          prev.includes(metric)
+                            ? prev.filter((m) => m !== metric)
+                            : [...prev, metric]
+                        );
+                      }}
+                      className={`cursor-pointer rounded-md border px-2.5 py-1 text-xs font-mono font-medium transition-all ${
+                        active
+                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                          : "bg-background text-foreground border-border hover:border-primary/50 hover:bg-accent"
+                      }`}
+                    >
+                      {formatMetricName(metric)}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

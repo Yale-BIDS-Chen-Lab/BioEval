@@ -318,12 +318,12 @@ router.get(
 
         if (!s3conn) {
           s3conn = await new S3Connection().connect();
-          s3conn.createTable("dataset", inference.datasetObjectKey);
+          await s3conn.createTable("dataset", inference.datasetObjectKey);
         }
 
         const tbl = `inference_${inferenceId}`;
         const alias = `t${idx}`;
-        s3conn.createTable("inference", inference.inferenceObjectKey, tbl);
+        await s3conn.createTable("inference", inference.inferenceObjectKey, tbl);
 
         infMeta.push({ table: tbl, alias, model: inference.model });
 
@@ -336,7 +336,7 @@ router.get(
           if (evalObject && evalObject.evaluationObjectKey) {
             const evalTbl = `evaluation_${inferenceId}`;
             const evalAlias = `e${idx}`;
-            s3conn.createTable("evaluation", evalObject.evaluationObjectKey, evalTbl);
+            await s3conn.createTable("evaluation", evalObject.evaluationObjectKey, evalTbl);
             evalMeta.push({ 
               table: evalTbl, 
               alias: evalAlias, 
@@ -596,6 +596,22 @@ router.post(
     "body"
   )
 );
+
+// Proxy to inference-service HTTP server for statistical analysis
+router.post("/statistical-analysis", async (req: AuthedRequest<{}>, res) => {
+  try {
+    const response = await fetch("http://inference:8000/statistics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const result = await response.json();
+    res.json(result);
+  } catch (err: any) {
+    console.error("[statistical-analysis] proxy error:", err.message);
+    res.status(502).json({ error: "Statistics service unavailable" });
+  }
+});
 
 const deleteInferenceSchema = z.object({
   inferenceId: z.string().nonempty(),

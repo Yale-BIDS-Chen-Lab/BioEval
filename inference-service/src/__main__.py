@@ -3,6 +3,7 @@ import threading
 from inference.message_handler import handle_inference_message
 from evaluation.message_handler import handle_evaluation_message
 from rabbitmq import RabbitMQConsumer
+from http_server import start_http_server
 
 
 def inference_handler(body: bytes) -> None:
@@ -16,6 +17,10 @@ def evaluation_handler(body: bytes) -> None:
 
 
 def main():
+  # Start HTTP server for synchronous tasks (statistics, etc.)
+  http_thread = threading.Thread(target=start_http_server, daemon=True)
+  http_thread.start()
+
   inference_consumer = RabbitMQConsumer("inference", inference_handler)
   evaluation_consumer = RabbitMQConsumer("evaluation", evaluation_handler)
 

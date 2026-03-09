@@ -1,10 +1,13 @@
 import { DataView } from "@/components/compare/compare-dataview";
 import { axios } from "@/lib/axios";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { BarChart3, Loader2 } from "lucide-react";
 
 // Helper function to format metric names for display
 const formatMetricName = (metric: string): string => {
@@ -51,6 +54,11 @@ function RouteComponent() {
   const { inferenceIds } = Route.useSearch();
   const ids = useMemo(() => inferenceIds.split(","), [inferenceIds]);
 
+  const [statsResult, setStatsResult] = useState<any>(null);
+  const [sampleSize, setSampleSize] = useState(40);
+  const [nBoot, setNBoot] = useState(1000);
+  const [selectedMetrics, setSelectedMetrics] = useState<Set<string> | null>(null);
+
   const { data, isPending, isError } = useQuery({
     queryKey: ["compare", ids],
     queryFn: () =>
@@ -58,6 +66,38 @@ function RouteComponent() {
         params: { inferenceIds: ids },
         withCredentials: true,
       }),
+  });
+
+  const statsMutation = useMutation({
+    mutationFn: async () => {
+      const records = data?.data?.records ?? [];
+      const models = data?.data?.meta?.models ?? [];
+      const commonMetrics = data?.data?.meta?.commonMetrics ?? [];
+      const modelNames = models.map((m: any) => m.model);
+      const metricsToAnalyze = selectedMetrics
+        ? commonMetrics.filter((m: string) => selectedMetrics.has(m))
+        : commonMetrics;
+      const payload: Record<string, Record<string, number[]>> = {};
+      for (const modelName of modelNames) {
+        payload[modelName] = {};
+        for (const metric of metricsToAnalyze) {
+          const key = `${modelName}:${metric}`;
+          const values = records
+            .map((r: any) => r[key])
+            .filter((v: any) => v !== undefined && v !== null)
+            .map(Number)
+            .filter((n: number) => !isNaN(n));
+          payload[modelName][metric] = values;
+        }
+      }
+      const { data: result } = await axios.post("api/inference/statistical-analysis", {
+        models: payload,
+        sampleSize,
+        nBoot,
+      }, { withCredentials: true });
+      return result;
+    },
+    onSuccess: (result) => setStatsResult(result),
   });
 
   if (isPending || isError) return <></>;
@@ -183,24 +223,154 @@ function RouteComponent() {
           </CardContent>
         </Card>
 
-        {commonMetrics.length > 0 && (
+        {/* Statistical Analysis */}
+        {models.length >= 2 && (
           <Card className="w-full">
             <CardHeader>
               <CardTitle>
-                <span className="text-xs">Per-Example Metrics</span>
+                <span className="text-xs">Statistical Analysis</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-1">
-                {commonMetrics.map((metric: string) => (
-                  <div key={metric} className="rounded px-2 py-1 bg-slate-100 dark:bg-slate-800">
-                    <span className="font-mono text-xs">{metric}</span>
+              {!statsResult ? (
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Wilcoxon rank-sum tests + bootstrap confidence intervals.
+                  </p>
+                  {commonMetrics.length > 0 && (
+                    <div>
+                      <label className="font-mono text-xs text-muted-foreground">Metrics</label>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {commonMetrics.map((metric: string) => {
+                          const active = !selectedMetrics || selectedMetrics.has(metric);
+                          return (
+                            <button
+                              key={metric}
+                              type="button"
+                              onClick={() => {
+                                setSelectedMetrics((prev) => {
+                                  const current = prev ?? new Set(commonMetrics as string[]);
+                                  const next = new Set(current);
+                                  if (next.has(metric)) {
+                                    next.delete(metric);
+                                    if (next.size === 0) return null;
+                                  } else {
+                                    next.add(metric);
+                                    if (next.size === commonMetrics.length) return null;
+                                  }
+                                  return next;
+                                });
+                              }}
+                              className={`rounded-md border px-2 py-0.5 font-mono text-xs cursor-pointer transition ${
+                                active
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-muted text-muted-foreground border-transparent opacity-50"
+                              }`}
+                            >
+                              {formatMetricName(metric)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="font-mono text-xs text-muted-foreground">Sample Size</label>
+                      <Input
+                        type="number"
+                        min={2}
+                        value={sampleSize}
+                        onChange={(e) => setSampleSize(Number(e.target.value) || 40)}
+                        className="mt-1 h-8 font-mono text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-mono text-xs text-muted-foreground">Bootstrap N</label>
+                      <Input
+                        type="number"
+                        min={100}
+                        step={100}
+                        value={nBoot}
+                        onChange={(e) => setNBoot(Number(e.target.value) || 1000)}
+                        className="mt-1 h-8 font-mono text-xs"
+                      />
+                    </div>
                   </div>
-                ))}
-              </div>
-              <p className="mt-3 text-xs text-muted-foreground">
-                Click metric buttons in the toolbar to show per-example scores
-              </p>
+                  <Button
+                    className="w-full gap-2 cursor-pointer"
+                    onClick={() => statsMutation.mutate()}
+                    disabled={statsMutation.isPending}
+                  >
+                    {statsMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <BarChart3 className="h-4 w-4" />
+                    )}
+                    {statsMutation.isPending ? "Analyzing..." : "Run Analysis"}
+                  </Button>
+                  {statsMutation.isError && (
+                    <p className="text-xs text-red-500">Analysis failed. Is the inference service running?</p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Bootstrap CIs */}
+                  <div>
+                    <div className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Bootstrap 95% CI
+                    </div>
+                    {Object.entries(statsResult.bootstrap ?? {}).map(([model, metrics]: [string, any]) => (
+                      <div key={model} className="mb-3">
+                        <div className="text-xs font-medium truncate mb-1" title={model}>{model}</div>
+                        <div className="space-y-1">
+                          {Object.entries(metrics).map(([metric, stats]: [string, any]) => (
+                            <div key={metric} className="flex items-center justify-between">
+                              <span className="font-mono text-xs text-muted-foreground">{formatMetricName(metric)}</span>
+                              <span className="font-mono text-xs">
+                                {stats.mean.toFixed(4)} [{stats.ci_low.toFixed(4)}, {stats.ci_high.toFixed(4)}]
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Pairwise Tests */}
+                  {statsResult.pairwise?.length > 0 && (
+                    <div>
+                      <div className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Pairwise Wilcoxon Tests
+                      </div>
+                      <div className="space-y-2">
+                        {statsResult.pairwise.map((t: any, i: number) => (
+                          <div key={i} className="rounded border p-2 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono text-xs font-medium">{formatMetricName(t.metric)}</span>
+                              <span className={`font-mono text-xs font-semibold ${t.p_value < 0.05 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                                p={t.p_value < 0.001 ? t.p_value.toExponential(2) : t.p_value.toFixed(4)}
+                              </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground truncate" title={`${t.modelA} vs ${t.modelB}`}>
+                              {t.modelA} vs {t.modelB}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <Button
+                    variant="outline"
+                    className="w-full cursor-pointer"
+                    size="sm"
+                    onClick={() => setStatsResult(null)}
+                  >
+                    Reset
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

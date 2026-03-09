@@ -59,4 +59,13 @@ export const dataviewSchema = z.object({
 
 export const compareSchema = z.object({
   inferenceIds: z.array(z.string().nonempty()).nonempty(),
-});
+  evaluationIds: z.array(z.string().nonempty()).optional(),
+}).refine(
+  (data) =>
+    data.evaluationIds === undefined ||
+    data.evaluationIds.length === data.inferenceIds.length,
+  {
+    message: "evaluationIds length must match inferenceIds length",
+    path: ["evaluationIds"],
+  }
+);

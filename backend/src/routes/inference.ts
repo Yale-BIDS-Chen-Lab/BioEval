@@ -295,8 +295,6 @@ router.get(
   ...validatedRoute(
     compareSchema,
     async (req, res) => {
-      console.log(req.body);
-
       const infMeta: any[] = [];
       const modelsMeta: any[] = [];
       const evalMeta: any[] = [];
@@ -327,23 +325,44 @@ router.get(
 
         infMeta.push({ table: tbl, alias, model: inference.model });
 
-        // Check if there's a completed evaluation for this inference
+        // Select one completed evaluation per inference (defaults to the first done eval)
         const evaluations = await getInferenceEvaluations(inferenceId, req.user.id);
-        const completedEval = evaluations.find((e) => e.status === "done");
-        
-        if (completedEval) {
-          const evalObject = await getEvaluationObject(completedEval.evaluationId, req.user.id);
-          if (evalObject && evalObject.evaluationObjectKey) {
-            const evalTbl = `evaluation_${inferenceId}`;
-            const evalAlias = `e${idx}`;
-            await s3conn.createTable("evaluation", evalObject.evaluationObjectKey, evalTbl);
-            evalMeta.push({ 
-              table: evalTbl, 
-              alias: evalAlias, 
-              model: inference.model,
-              evaluationId: completedEval.evaluationId 
-            });
+        const completedEvals = evaluations.filter((e) => e.status === "done");
+        const requestedEvaluationId = req.query.evaluationIds?.[idx];
+        const selectedEvaluationId =
+          requestedEvaluationId ?? completedEvals[0]?.evaluationId;
+
+        if (
+          requestedEvaluationId &&
+          !completedEvals.some((e) => e.evaluationId === requestedEvaluationId)
+        ) {
+          return res.status(StatusCodes.BAD_REQUEST).json({
+            success: false,
+            error: `Evaluation ${requestedEvaluationId} is not a completed evaluation for inference ${inferenceId}`,
+          });
+        }
+
+        const evalsToLoad = selectedEvaluationId
+          ? completedEvals.filter((e) => e.evaluationId === selectedEvaluationId)
+          : [];
+        let hasLoadedEvaluation = false;
+
+        for (const completedEval of evalsToLoad) {
+          const evalObject = await getEvaluationObject(
+            completedEval.evaluationId,
+            req.user.id
+          );
+          if (!evalObject || !evalObject.evaluationObjectKey) {
+            continue;
           }
+
+          const evalTbl = `evaluation_${inferenceId}`;
+          await s3conn.createTable("evaluation", evalObject.evaluationObjectKey, evalTbl);
+          evalMeta.push({
+            table: evalTbl,
+            model: inference.model,
+          });
+          hasLoadedEvaluation = true;
         }
 
         modelsMeta.push({
@@ -364,7 +383,12 @@ router.get(
             name: inference.taskName,
           },
           parameters: inference.parameters,
-          hasEvaluation: evalMeta.some(e => e.model === inference.model),
+          evaluations: completedEvals.map((e) => ({
+            evaluationId: e.evaluationId,
+            metrics: e.metrics,
+          })),
+          selectedEvaluationId: hasLoadedEvaluation ? selectedEvaluationId : null,
+          hasEvaluation: hasLoadedEvaluation,
         });
       }
 
@@ -399,9 +423,8 @@ router.get(
       const records = result.getRowObjectsJson();
 
       // Fetch parsed outputs and metrics from evaluations and merge
-      const allMetrics = new Set<string>();
+      const modelMetricSets: Record<string, Set<string>> = {};
       const aggregateMetrics: Record<string, Record<string, number>> = {}; // modelName -> {metricName: value}
-      let isFirstEval = true;
       
       for (const evalMetaItem of evalMeta) {
         // Fetch aggregate metrics for this evaluation
@@ -418,7 +441,10 @@ router.get(
               aggregateObj[item.key] = item.value;
             }
           });
-          aggregateMetrics[evalMetaItem.model] = aggregateObj;
+          aggregateMetrics[evalMetaItem.model] = {
+            ...(aggregateMetrics[evalMetaItem.model] ?? {}),
+            ...aggregateObj,
+          };
         }
         
         // Fetch per-example metrics
@@ -451,20 +477,10 @@ router.get(
           }
         });
         
-        // Track common metrics across all evaluations
-        if (isFirstEval) {
-          currentEvalMetrics.forEach(m => allMetrics.add(m));
-          isFirstEval = false;
-        } else {
-          // Keep only metrics that exist in all evaluations
-          const toRemove: string[] = [];
-          allMetrics.forEach(m => {
-            if (!currentEvalMetrics.has(m)) {
-              toRemove.push(m);
-            }
-          });
-          toRemove.forEach(m => allMetrics.delete(m));
+        if (!modelMetricSets[evalMetaItem.model]) {
+          modelMetricSets[evalMetaItem.model] = new Set<string>();
         }
+        currentEvalMetrics.forEach((m) => modelMetricSets[evalMetaItem.model].add(m));
         
         // Merge parsed outputs and metrics into records
         records.forEach((record: any) => {
@@ -482,6 +498,23 @@ router.get(
         });
       }
 
+      const comparedModelNames = modelsMeta.map((m) => m.model);
+      const uniqueComparedModelNames = Array.from(new Set(comparedModelNames));
+      let commonMetrics = new Set<string>();
+      if (uniqueComparedModelNames.length > 0) {
+        const firstMetrics =
+          modelMetricSets[uniqueComparedModelNames[0]] ?? new Set<string>();
+        commonMetrics = new Set(firstMetrics);
+
+        for (let i = 1; i < uniqueComparedModelNames.length; i++) {
+          const modelMetrics =
+            modelMetricSets[uniqueComparedModelNames[i]] ?? new Set<string>();
+          commonMetrics = new Set(
+            Array.from(commonMetrics).filter((m) => modelMetrics.has(m))
+          );
+        }
+      }
+
       await s3conn.dispose();
 
       res.json({ 
@@ -489,7 +522,7 @@ router.get(
         records, 
         meta: { 
           models: modelsMeta,
-          commonMetrics: Array.from(allMetrics).sort(),
+          commonMetrics: Array.from(commonMetrics).sort(),
           aggregateMetrics,
         } 
       });

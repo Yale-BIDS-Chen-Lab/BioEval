@@ -2,12 +2,19 @@ import { DataView } from "@/components/compare/compare-dataview";
 import { axios } from "@/lib/axios";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BarChart3, Loader2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // Helper function to format metric names for display
 const formatMetricName = (metric: string): string => {
@@ -41,6 +48,25 @@ const formatMetricName = (metric: string): string => {
   return metricMap[metric.toLowerCase()] || metric;
 };
 
+const getMetricSummary = (
+  metrics: unknown,
+  maxShown: number = 3,
+): string => {
+  const metricList = Array.isArray(metrics)
+    ? metrics
+        .filter((m): m is string => typeof m === "string" && m.length > 0)
+        .map(formatMetricName)
+    : [];
+
+  if (metricList.length === 0) return "no metrics";
+
+  const shown = metricList.slice(0, maxShown);
+  if (metricList.length > maxShown) {
+    return `${shown.join(", ")} +${metricList.length - maxShown}`;
+  }
+  return shown.join(", ");
+};
+
 export const Route = createFileRoute(
   "/_authed/dashboard/project/$projectId/compare",
 )({
@@ -58,15 +84,44 @@ function RouteComponent() {
   const [sampleSize, setSampleSize] = useState(40);
   const [nBoot, setNBoot] = useState(1000);
   const [selectedMetrics, setSelectedMetrics] = useState<Set<string> | null>(null);
+  const [evaluationSelections, setEvaluationSelections] = useState<
+    Record<string, string>
+  >({});
+
+  const compareQueryParams = useMemo(() => {
+    const params: Record<string, any> = { inferenceIds: ids };
+    const hasFullSelection = ids.every((id) => !!evaluationSelections[id]);
+    if (hasFullSelection) {
+      params.evaluationIds = ids.map((id) => evaluationSelections[id]);
+    }
+    return params;
+  }, [ids, evaluationSelections]);
 
   const { data, isPending, isError } = useQuery({
-    queryKey: ["compare", ids],
+    queryKey: ["compare", compareQueryParams],
     queryFn: () =>
       axios.get("api/inference/compare", {
-        params: { inferenceIds: ids },
+        params: compareQueryParams,
         withCredentials: true,
       }),
   });
+
+  useEffect(() => {
+    const models = data?.data?.meta?.models ?? [];
+    if (!Array.isArray(models) || models.length === 0) return;
+
+    setEvaluationSelections((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const model of models) {
+        if (!next[model.inferenceId] && model.selectedEvaluationId) {
+          next[model.inferenceId] = model.selectedEvaluationId;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [data?.data?.meta?.models]);
 
   const statsMutation = useMutation({
     mutationFn: async () => {
@@ -121,39 +176,45 @@ function RouteComponent() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-6">
-                {commonMetrics.map((metric: string) => (
-                  <div key={metric} className="space-y-2">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      {formatMetricName(metric)}
+              {commonMetrics.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No shared metrics across selected evaluations.
+                </p>
+              ) : (
+                <div className="space-y-6">
+                  {commonMetrics.map((metric: string) => (
+                    <div key={metric} className="space-y-2">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        {formatMetricName(metric)}
+                      </div>
+                      <div className="space-y-1">
+                        {Object.entries(aggregateMetrics).map(([modelName, metrics]: [string, any]) => {
+                          const metricObj = Array.isArray(metrics) 
+                            ? metrics.reduce((acc: any, item: any) => {
+                                if (item.key) acc[item.key] = item.value;
+                                return acc;
+                              }, {})
+                            : metrics;
+                          
+                          const value = metricObj[metric];
+                          if (value === undefined) return null;
+                          
+                          return (
+                            <div key={modelName} className="flex items-center justify-between py-1">
+                              <span className="text-xs truncate max-w-[60%]" title={modelName}>
+                                {modelName}
+                              </span>
+                              <span className="font-mono text-xs font-semibold">
+                                {typeof value === 'number' ? value.toFixed(4) : value}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      {Object.entries(aggregateMetrics).map(([modelName, metrics]: [string, any]) => {
-                        const metricObj = Array.isArray(metrics) 
-                          ? metrics.reduce((acc: any, item: any) => {
-                              if (item.key) acc[item.key] = item.value;
-                              return acc;
-                            }, {})
-                          : metrics;
-                        
-                        const value = metricObj[metric];
-                        if (value === undefined) return null;
-                        
-                        return (
-                          <div key={modelName} className="flex items-center justify-between py-1">
-                            <span className="text-xs truncate max-w-[60%]" title={modelName}>
-                              {modelName}
-                            </span>
-                            <span className="font-mono text-xs font-semibold">
-                              {typeof value === 'number' ? value.toFixed(4) : value}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -218,6 +279,53 @@ function RouteComponent() {
                       </div>
                     </div>
                   )}
+
+                {Array.isArray(m?.evaluations) && m.evaluations.length > 0 && (
+                  <div className="min-w-0 space-y-2">
+                    <span className="font-mono text-xs">Evaluation</span>
+                    <Select
+                      value={
+                        evaluationSelections[m.inferenceId] ??
+                        m.selectedEvaluationId ??
+                        undefined
+                      }
+                      onValueChange={(value) =>
+                        setEvaluationSelections((prev) => ({
+                          ...prev,
+                          [m.inferenceId]: value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="h-12 w-full px-4">
+                        <SelectValue placeholder="Select evaluation" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-96">
+                        {m.evaluations.map((e: any) => {
+                          const metricSummary = getMetricSummary(e.metrics, 6);
+                          return (
+                            <SelectItem
+                              key={e.evaluationId}
+                              value={e.evaluationId}
+                              className="px-3 py-3"
+                            >
+                              <span className="flex w-full min-w-0 items-center gap-3">
+                                <span className="shrink-0 rounded border bg-muted/30 px-2 py-0.5 font-mono text-xs text-foreground">
+                                  {e.evaluationId}
+                                </span>
+                                <span
+                                  className="min-w-0 truncate text-sm text-muted-foreground"
+                                  title={metricSummary}
+                                >
+                                  {metricSummary}
+                                </span>
+                              </span>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             ))}
           </CardContent>
@@ -237,6 +345,11 @@ function RouteComponent() {
                   <p className="text-xs text-muted-foreground">
                     Wilcoxon rank-sum tests + bootstrap confidence intervals.
                   </p>
+                  {commonMetrics.length === 0 && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      No shared metrics to analyze for the selected evaluations.
+                    </p>
+                  )}
                   {commonMetrics.length > 0 && (
                     <div>
                       <label className="font-mono text-xs text-muted-foreground">Metrics</label>
@@ -300,7 +413,7 @@ function RouteComponent() {
                   <Button
                     className="w-full gap-2 cursor-pointer"
                     onClick={() => statsMutation.mutate()}
-                    disabled={statsMutation.isPending}
+                    disabled={statsMutation.isPending || commonMetrics.length === 0}
                   >
                     {statsMutation.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />

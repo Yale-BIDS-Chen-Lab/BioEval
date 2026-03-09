@@ -1,10 +1,9 @@
-import pathlib
 from typing import Any, Literal
 
 import evaluate
 import numpy as np
+import torch
 from numpy.typing import NDArray
-from sklearn.metrics import accuracy_score
 
 from ..libs.bartscore import BARTScorer
 
@@ -13,6 +12,23 @@ _bartscore_instance = None
 _bertscore_instance = None
 _rouge_instance = None
 _meteor_instance = None
+_metric_device = None
+
+
+def get_metric_device() -> str:
+  """Pick the best available device for metric models."""
+  global _metric_device
+  if _metric_device is not None:
+    return _metric_device
+
+  if torch.cuda.is_available():
+    _metric_device = "cuda"
+  elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+    _metric_device = "mps"
+  else:
+    _metric_device = "cpu"
+
+  return _metric_device
 
 
 def accuracy(a: NDArray[Any], b: NDArray[Any]):
@@ -35,18 +51,22 @@ def accuracy(a: NDArray[Any], b: NDArray[Any]):
 # https://huggingface.co/spaces/evaluate-metric/bertscore
 def bertscore(a: NDArray[Any], b: NDArray[Any]):
   global _bertscore_instance
+  device = get_metric_device()
   
   if _bertscore_instance is None:
     print("Initializing BERTScore model...")
     _bertscore_instance = evaluate.load("bertscore")
     print("BERTScore model loaded successfully")
+
+  predictions = [str(x) if x is not None else "" for x in a.tolist()]
+  references = [str(x) if x is not None else "" for x in b.tolist()]
   
   try:
     results = _bertscore_instance.compute(
-      predictions=a,
-      references=b,
+      predictions=predictions,
+      references=references,
       model_type="bert-base-multilingual-cased",
-      device="cuda",
+      device=device,
     )
     if results is None:
       return np.zeros(len(a), dtype=float)  # Return 0.0 for all samples on failure
@@ -54,6 +74,25 @@ def bertscore(a: NDArray[Any], b: NDArray[Any]):
     row = np.asarray(results["f1"], dtype=float)
     return row
   except Exception as e:
+    if device != "cpu":
+      print(f"BERTScore failed on {device}: {e}. Retrying on CPU...")
+      try:
+        results = _bertscore_instance.compute(
+          predictions=predictions,
+          references=references,
+          model_type="bert-base-multilingual-cased",
+          device="cpu",
+        )
+        if results is None:
+          return np.zeros(len(a), dtype=float)
+        row = np.asarray(results["f1"], dtype=float)
+        return row
+      except Exception as retry_error:
+        print(
+          f"BERTScore retry on CPU failed: {retry_error}, returning zeros for {len(a)} samples"
+        )
+        return np.zeros(len(a), dtype=float)
+
     print(f"BERTScore error: {e}, returning zeros for {len(a)} samples")
     return np.zeros(len(a), dtype=float)
 
@@ -62,10 +101,11 @@ def bertscore(a: NDArray[Any], b: NDArray[Any]):
 # TODO: checkpoint should be a configurable parameter rather than hard-coded
 def bartscore(a: NDArray[Any], b: NDArray[Any]):
   global _bartscore_instance
+  device = "cuda" if torch.cuda.is_available() else "cpu"
   
   if _bartscore_instance is None:
-    print("Initializing BARTScore model (this happens only once)...")
-    _bartscore_instance = BARTScorer(device="cuda", checkpoint="facebook/bart-large-cnn")
+    print(f"Initializing BARTScore model on {device} (this happens only once)...")
+    _bartscore_instance = BARTScorer(device=device, checkpoint="facebook/bart-large-cnn")
     print("BARTScore model loaded successfully")
   
   try:

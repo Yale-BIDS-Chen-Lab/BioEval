@@ -28,7 +28,11 @@ def llm_judge_metric(
 
         scores = []
         for pred, ref in zip(predictions, references):
-            prompt = prompt_template.replace("{{reference}}", str(ref)).replace("{{output}}", str(pred)).replace("{{criterion}}", criterion).replace("{{scale}}", str(scale))
+            pred_str = str(pred).strip()
+            if not pred_str:
+                scores.append(1.0)
+                continue
+            prompt = prompt_template.replace("{{reference}}", str(ref)).replace("{{output}}", pred_str).replace("{{criterion}}", criterion).replace("{{scale}}", str(scale))
             
             # GPT-5 has different parameter requirements
             if model == "gpt-5":

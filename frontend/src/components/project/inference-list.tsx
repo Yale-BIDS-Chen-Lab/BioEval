@@ -3,6 +3,7 @@ import type { Inference } from "@/schemas/inference";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
+import { Columns2 } from "lucide-react";
 import { columns } from "../data-table/columns/inference";
 import { DataTable } from "../data-table/data-table";
 import { Button } from "../ui/button";
@@ -58,6 +59,11 @@ function InferenceList() {
   });
 
   const handleCompare = () => {
+    if (selectedRows.length < 2) {
+      toast.info("Select at least 2 inferences to compare.");
+      return;
+    }
+
     const datasetSet = new Set(selectedRows.map((r) => r.dataset));
     if (datasetSet.size > 1) {
       toast.error("Selected inferences must belong to the same dataset.");
@@ -76,6 +82,9 @@ function InferenceList() {
     });
   };
 
+  const selectedCount = selectedRows.length;
+  const canCompare = selectedCount >= 2;
+
   return (
     <>
       <DataTable
@@ -84,7 +93,7 @@ function InferenceList() {
         onSelectionChange={setSelectedRows}
       >
         <Button
-          className="h-8 cursor-pointer text-xs"
+          className="h-10 cursor-pointer px-4 text-base font-semibold tracking-tight"
           variant={"outline"}
           onClick={() =>
             navigate({
@@ -101,12 +110,22 @@ function InferenceList() {
         </Button>
 
         <Button
-          className="h-8 cursor-pointer text-xs"
+          className="h-10 min-w-[230px] cursor-pointer justify-between px-4 text-base font-semibold tracking-tight"
           variant="outline"
-          disabled={selectedRows.length < 2}
           onClick={handleCompare}
+          title={
+            canCompare
+              ? "Compare selected inferences"
+              : "Select at least 2 inferences to compare"
+          }
         >
-          Compare selected ({selectedRows.length})
+          <span className="inline-flex items-center gap-2">
+            <Columns2 className="h-4 w-4" />
+            Compare
+          </span>
+          <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-foreground">
+            {canCompare ? "Ready" : `${selectedCount}/2 selected`}
+          </span>
         </Button>
         {/* TODO: add model filter input */}
       </DataTable>

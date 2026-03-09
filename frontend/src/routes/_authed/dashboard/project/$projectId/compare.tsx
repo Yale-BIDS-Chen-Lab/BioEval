@@ -348,7 +348,7 @@ function RouteComponent() {
                           <div key={i} className="rounded border p-2 space-y-1">
                             <div className="flex items-center justify-between">
                               <span className="font-mono text-xs font-medium">{formatMetricName(t.metric)}</span>
-                              <span className={`font-mono text-xs font-semibold ${t.p_value < 0.05 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                              <span className={`font-mono text-xs font-semibold ${t.p_value < 0.05 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                                 p={t.p_value < 0.001 ? t.p_value.toExponential(2) : t.p_value.toFixed(4)}
                               </span>
                             </div>

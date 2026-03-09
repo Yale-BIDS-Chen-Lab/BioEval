@@ -12,15 +12,22 @@ import { Badge } from "@/components/ui/badge";
 
 function formatCreatedAt(value: string | null | undefined) {
   if (!value) return "-";
-  const date = new Date(value);
+  const normalized = value.trim().replace(" ", "T");
+  const withZone = /([zZ]|[+-]\d{2}:\d{2})$/.test(normalized)
+    ? normalized
+    : `${normalized}Z`;
+  const safeIso = withZone.replace(/\.(\d{3})\d+/, ".$1");
+  const date = new Date(safeIso);
   if (Number.isNaN(date.getTime())) return "-";
 
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat("en-US", {
     year: "numeric",
     month: "short",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "America/New_York",
+    timeZoneName: "short",
   }).format(date);
 }
 

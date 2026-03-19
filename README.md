@@ -40,6 +40,7 @@ Open **http://localhost:3000**, create an account, and add an integration under 
    cd docker-files
    docker compose up --build
    ```
+4. Open **http://localhost:3000** in your browser.
 
 ### macOS
 
@@ -50,6 +51,7 @@ Open **http://localhost:3000**, create an account, and add an integration under 
    cd docker-files
    docker compose up --build
    ```
+4. Open **http://localhost:3000** in your browser.
 
 ### Linux
 
@@ -65,6 +67,7 @@ Open **http://localhost:3000**, create an account, and add an integration under 
    cd docker-files
    docker compose -f docker-compose.yml -f docker-compose-gpu.yml up --build
    ```
+4. Open **http://localhost:3000** in your browser.
 
 ---
 

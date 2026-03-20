@@ -106,18 +106,25 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
 const AZURE_REASONING_PARAM_IDS = ["max_tokens", "reasoning_effort"];
 
+function isAzureReasoningModel(currentProvider: any, model: string | undefined) {
+  if (currentProvider?.providerId !== "azure" || !model) return false;
+
+  return (
+    currentProvider?.reasoningModelIds?.includes(model) ||
+    model.startsWith("gpt-5")
+  );
+}
+
 function AddModelPopup({ form, onAdd, providers }) {
   const providerId = useWatch({ control: form.control, name: "provider" });
   const model = useWatch({ control: form.control, name: "model" });
   const currentProvider = providers.find((p) => p.providerId === providerId);
   const doSampleValue = useWatch({ control: form.control, name: "parameters.do_sample" });
 
-  const isAzureReasoningModel =
-    currentProvider?.providerId === "azure" &&
-    currentProvider?.reasoningModelIds?.includes(model);
+  const isAzureReasoning = isAzureReasoningModel(currentProvider, model);
 
   const visibleParameters = currentProvider?.parameters?.filter((p) => {
-    if (isAzureReasoningModel) {
+    if (isAzureReasoning) {
       // For reasoning models: only show max_tokens and reasoning_effort
       return AZURE_REASONING_PARAM_IDS.includes(p.id);
     } else if (currentProvider?.providerId === "azure") {
@@ -169,7 +176,7 @@ function AddModelPopup({ form, onAdd, providers }) {
     const paramObj = form.getValues("parameters") || {};
     
     let filteredParams = Object.entries(paramObj);
-    if (provider === "azure" && currentProvider?.reasoningModelIds?.includes(model)) {
+    if (provider === "azure" && isAzureReasoningModel(currentProvider, model)) {
       // For reasoning models: only keep max_tokens and reasoning_effort
       filteredParams = filteredParams.filter(([id]) =>
         AZURE_REASONING_PARAM_IDS.includes(id)
@@ -247,7 +254,7 @@ function AddModelPopup({ form, onAdd, providers }) {
               const enumOptions = Array.isArray(schema.enum)
                 ? (schema.enum as string[])
                 : p.id === "reasoning_effort"
-                  ? ["low", "medium", "high"]
+                  ? ["none", "low", "medium", "high", "xhigh"]
                   : null;
               const isEnum = enumOptions !== null && enumOptions.length > 0;
               

@@ -101,7 +101,7 @@ def bertscore(a: NDArray[Any], b: NDArray[Any]):
 # TODO: checkpoint should be a configurable parameter rather than hard-coded
 def bartscore(a: NDArray[Any], b: NDArray[Any]):
   global _bartscore_instance
-  device = "cuda" if torch.cuda.is_available() else "cpu"
+  device = get_metric_device()
   
   if _bartscore_instance is None:
     print(f"Initializing BARTScore model on {device} (this happens only once)...")
@@ -114,6 +114,21 @@ def bartscore(a: NDArray[Any], b: NDArray[Any]):
     row = np.asarray(results, dtype=float)
     return row
   except Exception as e:
+    if device != "cpu":
+      print(f"BARTScore failed on {device}: {e}. Retrying on CPU...")
+      try:
+        _bartscore_instance = BARTScorer(
+          device="cpu", checkpoint="facebook/bart-large-cnn"
+        )
+        results = _bartscore_instance.score(srcs=list(a), tgts=list(b), batch_size=8)
+        row = np.asarray(results, dtype=float)
+        return row
+      except Exception as retry_error:
+        print(
+          f"BARTScore retry on CPU failed: {retry_error}, returning zeros for {len(a)} samples"
+        )
+        return np.zeros(len(a), dtype=float)
+
     print(f"BARTScore error: {e}, returning zeros for {len(a)} samples")
     return np.zeros(len(a), dtype=float)
 

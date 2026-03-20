@@ -6,9 +6,20 @@ import botocore.exceptions
 import pyarrow
 import pyarrow.parquet
 
+
+def resolve_endpoint_url() -> str:
+  if endpoint_url := os.getenv("S3_ENDPOINT_URL"):
+    return endpoint_url
+
+  endpoint = os.getenv("S3_ENDPOINT", "minio:9000")
+  use_ssl = os.getenv("S3_USE_SSL", "false").lower() in ("1", "true", "yes", "on")
+  scheme = "https" if use_ssl else "http"
+  return f"{scheme}://{endpoint}"
+
+
 client = boto3.client(
   service_name="s3",
-  endpoint_url="http://minio:9000",
+  endpoint_url=resolve_endpoint_url(),
   aws_access_key_id=os.environ["MINIO_ROOT_USER"],
   aws_secret_access_key=os.environ["MINIO_ROOT_PASSWORD"],
 )

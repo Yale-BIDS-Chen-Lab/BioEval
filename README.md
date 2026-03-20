@@ -45,13 +45,39 @@ Open **http://localhost:3000**, create an account, and add an integration under 
 ### macOS
 
 1. Install [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/).
-2. NVIDIA GPU is not supported on macOS — use the **Azure OpenAI** integration for inference.
+2. For the default all-Docker setup, use the **Azure OpenAI** integration for inference. If you want local HuggingFace inference on Apple GPU, use the **macOS With Local HuggingFace on Apple GPU (MPS)** path below instead.
 3. Open **Terminal**:
    ```bash
    cd docker-files
    docker compose up --build
    ```
 4. Open **http://localhost:3000** in your browser.
+
+### macOS With Local HuggingFace on Apple GPU (MPS)
+
+Use this path if you want BioEval to keep the shared stack in Docker but run `inference-service` natively on your Mac so HuggingFace models can use `mps`.
+
+1. Copy the Docker env file:
+   ```bash
+   cd docker-files
+   cp .env.example .env
+   ```
+2. Start the shared services without the Docker `inference` container:
+   ```bash
+   cd docker-files
+   ./start-macos-host-stack.sh
+   ```
+3. In a second terminal, start `inference-service` on macOS:
+   ```bash
+   cd inference-service
+   ./scripts/run-macos-host.sh
+   ```
+4. Open **http://localhost:3000** in your browser.
+
+Notes:
+- This route exposes Postgres, RabbitMQ, and MinIO to `localhost` so the native `inference-service` can connect.
+- Keep the Docker `inference` service stopped while the host-native service is running, otherwise both workers will compete for the same RabbitMQ queues.
+- The backend container reaches the host-native statistics server through `http://host.docker.internal:8000`.
 
 ### Linux
 

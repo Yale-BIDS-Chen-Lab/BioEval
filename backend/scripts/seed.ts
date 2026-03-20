@@ -682,6 +682,7 @@ const providers = [
       ],
     },
     models: [
+      "meta-llama/Llama-3.1-8B-Instruct",
       "meta-llama/Llama-3.2-1B",
       "meta-llama/Llama-3.2-1B-Instruct",
       "meta-llama/Llama-3.2-3B",
@@ -738,13 +739,15 @@ const providers = [
           id: "reasoning_effort",
           name: "Reasoning effort",
           description:
-            "For reasoning models (o1, o3, o3-mini, o4-mini, gpt-5): low, medium, or high. Higher = more reasoning tokens.",
-          schema: z.toJSONSchema(z.enum(["low", "medium", "high"])),
+            "For reasoning models (o1, o3, o3-mini, o4-mini, gpt-5, gpt-5.4): none, low, medium, high, or xhigh. Higher = more reasoning tokens.",
+          schema: z.toJSONSchema(
+            z.enum(["none", "low", "medium", "high", "xhigh"])
+          ),
           defaultValue: "medium",
         },
       ],
     },
-    models: ["gpt-4o", "gpt-5", "o1", "o3", "o3-mini", "o4-mini"],
+    models: ["gpt-4o", "gpt-5", "gpt-5.4", "o1", "o3", "o3-mini", "o4-mini"],
   },
 ];
 

@@ -2,7 +2,7 @@ import secrets
 
 import storage.object
 from db.queries import inference, config
-from inference.huggingface import HuggingfaceClient
+from inference.huggingface import HuggingfaceClient, InferenceCanceledError
 from inference.azure import AzureClient
 from storage import duckdb, minio
 
@@ -24,6 +24,11 @@ def get_duckdb_connections(
 # TODO: move me
 def format_prompt(raw_prompt: str, raw_input: str):
   return raw_prompt.replace("{{input}}", raw_input)
+
+
+def is_inference_canceled(inference_id: str) -> bool:
+  inference_record = inference.get_inference(inference_id)
+  return bool(inference_record and inference_record["status"] == "canceled")
 
 
 def process_dataset(
@@ -60,6 +65,9 @@ def process_dataset(
       try:
         result = client.generate([input_text])
         outputs.append(result[0] if result else None)
+      except InferenceCanceledError:
+        print(f"Inference {inference_id} was canceled while generating example {ids[idx]}")
+        return
       except Exception as e:
         # Record error for this specific example
         error_msg = f"[ERROR: {type(e).__name__}]"
@@ -122,6 +130,7 @@ def handle_inference_message(inference_id: str) -> None:
           config_record["settings"],
           inference_record["model"],
           inference_record["parameters"],
+          cancel_check=lambda: is_inference_canceled(inference_id),
         )
       case "azure":
         client = AzureClient(
@@ -133,6 +142,10 @@ def handle_inference_message(inference_id: str) -> None:
         raise Exception(
           f"provider {inference_record['providerId']} is not implemented yet"
         )
+
+    if is_inference_canceled(inference_id):
+      print(f"Inference {inference_id} was canceled during setup, stopping...")
+      return
 
     process_dataset(
       con_dataset=con_dataset,

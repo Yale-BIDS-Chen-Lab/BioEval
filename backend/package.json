@@ -6,7 +6,8 @@
     "start": "ts-node src/index.ts",
     "start:dist": "node dist/index.js",
     "dev": "nodemon src/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "seed:models": "ts-node scripts/seed-models.ts"
   },
   "keywords": [],
   "author": "",

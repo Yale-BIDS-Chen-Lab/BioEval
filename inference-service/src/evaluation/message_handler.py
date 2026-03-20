@@ -50,12 +50,18 @@ def get_parsing_function(function_id, custom_code=None):
       exec(custom_code, namespace)
       if "parse" in namespace and callable(namespace["parse"]):
         return namespace["parse"]
+      if function_id in namespace and callable(namespace[function_id]):
+        return namespace[function_id]
       else:
-        print(f"Custom function {function_id} does not define a 'parse' function")
-        return lambda x, _: x
+        print(
+          f"Custom function {function_id} does not define a callable "
+          f"'parse' or '{function_id}', falling back to built-in handler"
+        )
     except Exception as e:
-      print(f"Error executing custom function {function_id}: {e}")
-      return lambda x, _: x
+      print(
+        f"Error executing custom function {function_id}: {e}. "
+        "Falling back to built-in handler if available."
+      )
   
   # Built-in functions
   match function_id:

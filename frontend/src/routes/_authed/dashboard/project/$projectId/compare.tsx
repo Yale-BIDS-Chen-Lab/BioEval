@@ -126,6 +126,13 @@ function RouteComponent() {
     });
   }, [data?.data?.meta?.models]);
 
+  useEffect(() => {
+    const recordCount = data?.data?.records?.length;
+    if (typeof recordCount === "number" && recordCount > 0) {
+      setSampleSize(recordCount);
+    }
+  }, [data?.data?.records?.length]);
+
   const statsMutation = useMutation({
     mutationFn: async () => {
       const records = data?.data?.records ?? [];

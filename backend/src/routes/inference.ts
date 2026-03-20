@@ -160,7 +160,14 @@ router.get(
 );
 
 // candidate for caching
-const AZURE_REASONING_MODEL_IDS = ["o1", "o3", "o3-mini", "o4-mini", "gpt-5"];
+const AZURE_REASONING_MODEL_IDS = [
+  "o1",
+  "o3",
+  "o3-mini",
+  "o4-mini",
+  "gpt-5",
+  "gpt-5.4",
+];
 
 router.get("/options", async (req: AuthedRequest<{}>, res) => {
   const tasks = await getTasks();
@@ -636,7 +643,9 @@ router.post(
 // Proxy to inference-service HTTP server for statistical analysis
 router.post("/statistical-analysis", async (req: AuthedRequest<{}>, res) => {
   try {
-    const response = await fetch("http://inference:8000/statistics", {
+    const inferenceServiceUrl =
+      process.env.INFERENCE_SERVICE_URL ?? "http://inference:8000";
+    const response = await fetch(`${inferenceServiceUrl}/statistics`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req.body),

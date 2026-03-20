@@ -3,7 +3,7 @@ from typing import Dict, List
 
 from openai import AzureOpenAI
 
-REASONING_FAMILIES = ("o1", "o3", "o4", "o3-mini", "gpt-5")
+_REASONING_PREFIXES = ("o1", "o3", "o4", "gpt-5")
 
 _ALLOWED_COMMON = {
   "temperature",
@@ -32,9 +32,12 @@ def format_parameters(
   if "repetition_penalty" in params:
     params["frequency_penalty"] = params.pop("repetition_penalty")
 
-  is_reasoning = model_name in REASONING_FAMILIES
+  normalized_model_name = model_name.lower()
+  is_reasoning = normalized_model_name.startswith(_REASONING_PREFIXES)
   if is_reasoning:
-    # Reasoning models (o1, o3, o4, o3-mini, o4-mini, gpt-5) only support max_completion_tokens and reasoning_effort; temperature/top_p/etc. cause 400
+    # Reasoning models (o1/o3/o4 and GPT-5 family, including gpt-5.4)
+    # use max_completion_tokens plus reasoning_effort. Sampling params
+    # are intentionally stripped to match the model family contract.
     if "max_tokens" in params:
       params["max_completion_tokens"] = params.pop("max_tokens")
     allowed = {"max_completion_tokens", "reasoning_effort"}

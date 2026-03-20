@@ -16,8 +16,14 @@ class RequestHandler(BaseHTTPRequestHandler):
             models = body.get("models", {})
             sample_size = body.get("sampleSize", 40)
             n_boot = body.get("nBoot", 1000)
+            test_method = body.get("testMethod", "signed-rank")
 
-            result = run_statistical_analysis(models, sample_size, n_boot)
+            result = run_statistical_analysis(
+                models,
+                sample_size,
+                n_boot,
+                test_method,
+            )
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")

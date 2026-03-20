@@ -1,7 +1,7 @@
-"""Statistical analysis: Wilcoxon rank-sum test + bootstrap confidence intervals."""
+"""Statistical analysis: Wilcoxon tests + bootstrap confidence intervals."""
 
 import numpy as np
-from scipy.stats import ranksums
+from scipy.stats import ranksums, wilcoxon
 
 
 def bootstrap_stats(
@@ -32,21 +32,27 @@ def run_statistical_analysis(
     models: dict[str, dict[str, list[float]]],
     sample_size: int = 40,
     n_boot: int = 1000,
+    test_method: str = "signed-rank",
 ) -> dict:
     """
-    Run pairwise Wilcoxon rank-sum tests and bootstrap CI for each model/metric.
+    Run pairwise Wilcoxon tests and bootstrap CI for each model/metric.
 
     Args:
         models: { modelName: { metricName: [per-example values] } }
         sample_size: bootstrap sample size
         n_boot: number of bootstrap iterations
+        test_method: "signed-rank" (paired) or "rank-sum" (unpaired)
 
     Returns:
         {
+          "testMethod": "signed-rank" | "rank-sum",
           "bootstrap": { modelName: { metricName: { mean, std, ci_low, ci_high } } },
           "pairwise": [ { modelA, modelB, metric, statistic, p_value } ]
         }
     """
+    if test_method not in {"signed-rank", "rank-sum"}:
+        test_method = "signed-rank"
+
     model_names = list(models.keys())
 
     # Collect common metrics
@@ -65,26 +71,45 @@ def run_statistical_analysis(
                 scores, sample_size, n_boot
             )
 
-    # Pairwise Wilcoxon rank-sum tests
+    # Pairwise Wilcoxon tests
     pairwise_results: list[dict] = []
     for i in range(len(model_names)):
         for j in range(i + 1, len(model_names)):
             model_a, model_b = model_names[i], model_names[j]
             for metric in common_metrics:
-                scores_a = models[model_a].get(metric, [])
-                scores_b = models[model_b].get(metric, [])
+                scores_a = np.asarray(models[model_a].get(metric, []), dtype=float)
+                scores_b = np.asarray(models[model_b].get(metric, []), dtype=float)
                 if len(scores_a) < 2 or len(scores_b) < 2:
                     continue
-                stat, p_value = ranksums(scores_a, scores_b)
+
+                if test_method == "signed-rank":
+                    if len(scores_a) != len(scores_b):
+                        continue
+
+                    differences = scores_a - scores_b
+                    if np.allclose(differences, 0):
+                        stat, p_value = 0.0, 1.0
+                    else:
+                        stat, p_value = wilcoxon(
+                            scores_a,
+                            scores_b,
+                            zero_method="wilcox",
+                            alternative="two-sided",
+                        )
+                else:
+                    stat, p_value = ranksums(scores_a, scores_b)
+
                 pairwise_results.append({
                     "modelA": model_a,
                     "modelB": model_b,
                     "metric": metric,
+                    "testMethod": test_method,
                     "statistic": round(float(stat), 4),
                     "p_value": float(p_value),
                 })
 
     return {
+        "testMethod": test_method,
         "bootstrap": bootstrap_results,
         "pairwise": pairwise_results,
     }

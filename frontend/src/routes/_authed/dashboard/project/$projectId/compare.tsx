@@ -81,6 +81,9 @@ function RouteComponent() {
   const ids = useMemo(() => inferenceIds.split(","), [inferenceIds]);
 
   const [statsResult, setStatsResult] = useState<any>(null);
+  const [testMethod, setTestMethod] = useState<"signed-rank" | "rank-sum">(
+    "signed-rank",
+  );
   const [sampleSize, setSampleSize] = useState(40);
   const [nBoot, setNBoot] = useState(1000);
   const [selectedMetrics, setSelectedMetrics] = useState<Set<string> | null>(null);
@@ -135,7 +138,26 @@ function RouteComponent() {
       const payload: Record<string, Record<string, number[]>> = {};
       for (const modelName of modelNames) {
         payload[modelName] = {};
-        for (const metric of metricsToAnalyze) {
+      }
+
+      for (const metric of metricsToAnalyze) {
+        if (testMethod === "signed-rank") {
+          const alignedRows = records.filter((record: any) =>
+            modelNames.every((modelName: string) => {
+              const value = Number(record[`${modelName}:${metric}`]);
+              return !isNaN(value);
+            }),
+          );
+
+          for (const modelName of modelNames) {
+            payload[modelName][metric] = alignedRows.map((record: any) =>
+              Number(record[`${modelName}:${metric}`]),
+            );
+          }
+          continue;
+        }
+
+        for (const modelName of modelNames) {
           const key = `${modelName}:${metric}`;
           const values = records
             .map((r: any) => r[key])
@@ -149,6 +171,7 @@ function RouteComponent() {
         models: payload,
         sampleSize,
         nBoot,
+        testMethod,
       }, { withCredentials: true });
       return result;
     },
@@ -343,7 +366,9 @@ function RouteComponent() {
               {!statsResult ? (
                 <div className="space-y-3">
                   <p className="text-xs text-muted-foreground">
-                    Wilcoxon rank-sum tests + bootstrap confidence intervals.
+                    {testMethod === "signed-rank"
+                      ? "Wilcoxon signed-rank tests (paired, default) + bootstrap confidence intervals."
+                      : "Wilcoxon rank-sum tests (unpaired) + bootstrap confidence intervals."}
                   </p>
                   {commonMetrics.length === 0 && (
                     <p className="text-xs text-amber-600 dark:text-amber-400">
@@ -387,7 +412,28 @@ function RouteComponent() {
                       </div>
                     </div>
                   )}
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="font-mono text-xs text-muted-foreground">Test</label>
+                      <Select
+                        value={testMethod}
+                        onValueChange={(value: "signed-rank" | "rank-sum") =>
+                          setTestMethod(value)
+                        }
+                      >
+                        <SelectTrigger className="mt-1 h-8 font-mono text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="signed-rank">
+                            Wilcoxon signed-rank
+                          </SelectItem>
+                          <SelectItem value="rank-sum">
+                            Wilcoxon rank-sum
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div>
                       <label className="font-mono text-xs text-muted-foreground">Sample Size</label>
                       <Input
@@ -454,7 +500,10 @@ function RouteComponent() {
                   {statsResult.pairwise?.length > 0 && (
                     <div>
                       <div className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                        Pairwise Wilcoxon Tests
+                        Pairwise{" "}
+                        {statsResult.testMethod === "rank-sum"
+                          ? "Wilcoxon Rank-Sum Tests"
+                          : "Wilcoxon Signed-Rank Tests"}
                       </div>
                       <div className="space-y-2">
                         {statsResult.pairwise.map((t: any, i: number) => (

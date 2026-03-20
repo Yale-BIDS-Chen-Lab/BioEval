@@ -156,21 +156,49 @@ export function DataView({
     return labels;
   }, [outputKeys]);
 
+  const splitOutputHeaderLabel = (label: string) => {
+    const match = label.match(/^(.*)\s(Output|Parsed)(\s\(\d+\))?$/);
+    if (!match) {
+      return { modelLabel: label, valueLabel: "" };
+    }
+
+    return {
+      modelLabel: match[1],
+      valueLabel: `${match[2]}${match[3] ?? ""}`,
+    };
+  };
+
   const outputColumns = useMemo<ColumnDef<any>[]>(
     () =>
-      outputKeys.map((key) => ({
-        id: key,
-        accessorFn: (row) => row[key] as string,
-        meta: { label: headerLabels[key] },
-        header: () => (
-          <div className="text-foreground w-64 text-left font-mono text-xs font-bold">
-            {headerLabels[key]}
-          </div>
-        ),
-        cell: ({ row }) => (
-          <Cell value={row.getValue(key)} expanded={row.getIsSelected()} />
-        ),
-      })),
+      outputKeys.map((key) => {
+        const { modelLabel, valueLabel } = splitOutputHeaderLabel(headerLabels[key]);
+
+        return {
+          id: key,
+          accessorFn: (row) => row[key] as string,
+          size: 256,
+          maxSize: 256,
+          meta: { label: headerLabels[key] },
+          header: () => (
+            <div className="text-foreground min-w-0 w-64 text-left font-mono text-xs font-bold">
+              <span className="block truncate" title={modelLabel}>
+                {modelLabel}
+              </span>
+              {valueLabel ? (
+                <span
+                  className="text-muted-foreground block truncate font-normal"
+                  title={valueLabel}
+                >
+                  {valueLabel}
+                </span>
+              ) : null}
+            </div>
+          ),
+          cell: ({ row }) => (
+            <Cell value={row.getValue(key)} expanded={row.getIsSelected()} />
+          ),
+        };
+      }),
     [outputKeys, headerLabels],
   );
 

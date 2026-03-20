@@ -32,6 +32,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       PYTHONUNBUFFERED: 1
       HF_HOME: /app/.cache/huggingface
+      INFERENCE_HTTP_PORT: 8000
     volumes:
       - hf_cache:/app/.cache/huggingface
     depends_on:
@@ -66,6 +67,7 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      INFERENCE_SERVICE_URL: ${INFERENCE_SERVICE_URL:-http://inference:8000}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -105,9 +107,9 @@ services:
   rabbitmq:
     image: docker.io/library/rabbitmq:3-management
     hostname: my-rabbitmq
-    # ports:
-    #   - "5672:5672" # amqp
-    #   - "15672:15672" # management
+    ports:
+      - "${RABBITMQ_HOST_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_HOST_PORT:-15672}:15672"
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
@@ -130,8 +132,8 @@ services:
   db:
     image: docker.io/library/postgres:17
     restart: always
-    # ports:
-    #   - "5432:5432"
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -147,8 +149,8 @@ services:
   minio:
     image: minio/minio:latest
     ports:
-      - 9000:9000
-      - 9001:9001
+      - "${MINIO_API_HOST_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}

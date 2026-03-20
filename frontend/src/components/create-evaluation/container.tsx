@@ -8,7 +8,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { SelectParsingFunctions } from "./select-parsing";
 
 const schema = z.object({
-  metrics: z.array(z.string()).nonempty(),
+  metrics: z.array(z.string()).min(1),
   parsingFunctions: z.array(
     z.object({
       id: z.string(),
@@ -65,22 +65,23 @@ export function Container({
     (inf: any) => inf.inferenceId === inferenceId,
   );
   const taskId = selectedInference?.taskId;
+  const selectedTask = taskId ? tasks?.[taskId] : undefined;
 
   // Filter out internal/basic parsing functions from UI (but keep them in DB for backward compatibility)
   const filteredParsingFunctions = data.data.parsingFunctions.filter((fn: any) => 
-    !['extract_first_character', 'extract_first_word', 'process_mcq_option'].includes(fn.taskId)
+    ![
+      "extract_first_character",
+      "extract_first_word",
+      "process_mcq_option",
+      "extract_ner_spans",
+    ].includes(fn.taskId)
   );
 
   // Default parsing functions for MLC and NER tasks
   const defaultParsingFunctions = (() => {
-    // NER tasks: automatically use extract_ner_spans
-    if (taskId === "ner") {
-      return [{
-        id: "extract_ner_spans",
-        arguments: [],
-      }];
-    }
-    
+    // NER parsing is already handled automatically in the evaluation worker.
+    if (taskId === "ner") return [];
+
     // MLC tasks with classes
     if (taskId === "mlc" && selectedInference?.classes?.length > 0) {
       const datasetName = selectedInference?.dataset?.toLowerCase() || "";
@@ -109,12 +110,23 @@ export function Container({
     return [];
   })();
 
+  if (!selectedInference || !selectedTask) {
+    return (
+      <div className="text-muted-foreground p-4 text-sm">
+        This inference is not available for evaluation. Only completed
+        inferences can be evaluated.
+      </div>
+    );
+  }
+
   return (
     <MultiStepForm
       schema={schema}
       defaultValues={{ metrics: [], parsingFunctions: defaultParsingFunctions, llmJudgeConfig: {} }}
       submitting={mutation.isPending}
-      onSubmit={(v) => mutation.mutateAsync(v)}
+      onSubmit={async (v) => {
+        await mutation.mutateAsync(v);
+      }}
       steps={[
         {
           id: "parsing-fns",
@@ -130,7 +142,7 @@ export function Container({
           id: "metrics",
           render: (form) => (
             <SelectMetrics
-              metrics={tasks[taskId].metrics}
+              metrics={selectedTask.metrics}
               form={form}
               llmJudgeConfig={form.watch("llmJudgeConfig")}
             />

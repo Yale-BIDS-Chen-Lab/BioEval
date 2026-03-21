@@ -1,5 +1,6 @@
 import threading
 
+from db.pool import pool
 from inference.message_handler import handle_inference_message
 from evaluation.message_handler import handle_evaluation_message
 from rabbitmq import RabbitMQConsumer
@@ -16,7 +17,16 @@ def evaluation_handler(body: bytes) -> None:
   handle_evaluation_message(evaluation_id)
 
 
+def ensure_database_ready() -> None:
+  with pool.connection() as conn:
+    with conn.cursor() as cur:
+      cur.execute("select 1")
+      cur.fetchone()
+
+
 def main():
+  ensure_database_ready()
+
   # Start HTTP server for synchronous tasks (statistics, etc.)
   http_thread = threading.Thread(target=start_http_server, daemon=True)
   http_thread.start()

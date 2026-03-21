@@ -70,7 +70,7 @@ if [[ -f "$DOCKER_ENV_FILE" ]]; then
   set +a
 fi
 
-export DATABASE_URL="${DATABASE_URL:-postgresql://${POSTGRES_USER:-test}:${POSTGRES_PASSWORD:-test}@localhost:${POSTGRES_HOST_PORT:-5432}/${POSTGRES_DB:-bioeval}}"
+export DATABASE_URL="${DATABASE_URL:-postgresql://${POSTGRES_USER:-test}:${POSTGRES_PASSWORD:-test}@127.0.0.1:${POSTGRES_HOST_PORT:-5432}/${POSTGRES_DB:-bioeval}?connect_timeout=5&sslmode=disable&gssencmode=disable}"
 export RABBITMQ_HOST="${RABBITMQ_HOST:-localhost}"
 export RABBITMQ_USER="${RABBITMQ_USER:-guest}"
 export RABBITMQ_PASSWORD="${RABBITMQ_PASSWORD:-guest}"
@@ -85,6 +85,7 @@ export MINIO_ROOT_USER="${MINIO_ROOT_USER:-minio-root-user}"
 export MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-minio-root-password}"
 export PYTORCH_ENABLE_MPS_FALLBACK="${PYTORCH_ENABLE_MPS_FALLBACK:-1}"
 export UV_CACHE_DIR="${UV_CACHE_DIR:-$ROOT_DIR/inference-service/.cache/uv}"
+export BIOEVAL_DB_CONNECTION_MODE="${BIOEVAL_DB_CONNECTION_MODE:-direct}"
 
 cd "$ROOT_DIR/inference-service"
 

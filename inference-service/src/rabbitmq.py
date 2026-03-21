@@ -34,11 +34,24 @@ class RabbitMQConsumer:
     else:
       print("ERROR: can't ack message! channel is closed")
 
+  def nack_message(self, channel: BlockingChannel, delivery_tag):
+    if channel.is_open:
+      channel.basic_nack(delivery_tag=delivery_tag, requeue=True)
+    else:
+      print("ERROR: can't nack message! channel is closed")
+
   # Not thread-safe in general, but safe here because prefetch_count=1 limits to one active thread at a time.
   def process_message(
     self, channel: BlockingChannel, delivery_tag, body: bytes
   ) -> None:
-    self.handler(body)
+    try:
+      self.handler(body)
+    except Exception as exc:
+      print(f"ERROR: handler failed for queue {self.queue}: {type(exc).__name__}: {exc}")
+      callback = functools.partial(self.nack_message, channel, delivery_tag)
+      channel.connection.add_callback_threadsafe(callback)
+      return
+
     callback = functools.partial(self.ack_message, channel, delivery_tag)
     channel.connection.add_callback_threadsafe(callback)
 

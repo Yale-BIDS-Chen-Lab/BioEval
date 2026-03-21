@@ -111,8 +111,8 @@ class EvaluationClient:
   def calculate_individual_metrics(
     self, predictions: list[str], references: list[str]
   ) -> list[tuple[str, tuple[NDArray[Any], Any] | None]]:
-    parsed_preds = np.asarray(predictions)
-    parsed_refs = np.asarray(references)
+    parsed_preds = self._to_metric_array(predictions)
+    parsed_refs = self._to_metric_array(references)
 
     metrics = []
     for metric_id, callable in self._individual_callables:
@@ -124,8 +124,8 @@ class EvaluationClient:
   def calculate_aggregate_metrics(
     self, predictions: list[str], references: list[str]
   ) -> list[tuple[str, float]]:
-    parsed_preds = np.asarray(predictions)
-    parsed_refs = np.asarray(references)
+    parsed_preds = self._to_metric_array(predictions)
+    parsed_refs = self._to_metric_array(references)
 
     metrics = []
     for metric_id, callable in self._aggregate_callables:
@@ -133,3 +133,11 @@ class EvaluationClient:
       metrics.append((metric_id, result))
 
     return metrics
+
+  @staticmethod
+  def _to_metric_array(values: list[Any]) -> NDArray[Any]:
+    try:
+      return np.asarray(values)
+    except ValueError:
+      # Structured predictions such as NER span lists are ragged by design.
+      return np.asarray(values, dtype=object)

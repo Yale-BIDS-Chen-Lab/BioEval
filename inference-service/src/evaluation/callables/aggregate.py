@@ -43,8 +43,6 @@ def exact_match(variant: Literal["precision", "recall", "f1"]) -> Callable:
     return {tuple(x) for x in arr}
 
   def compute(predictions: NDArray[Any], references: NDArray[Any]):
-    print("exact match computation", predictions, references)
-
     preds = np.asarray(predictions, dtype=object).ravel()
     refs = np.asarray(references, dtype=object).ravel()
 
@@ -71,8 +69,6 @@ def exact_match(variant: Literal["precision", "recall", "f1"]) -> Callable:
       ref_spans = refs[i] if i < len(refs) else []
       for span in ref_spans:
         y_true[i, idx[tuple(span)]] = 1
-
-    print("computing exact match", y_true, y_pred)
 
     precision, recall, f1, _ = precision_recall_fscore_support(
       y_true,

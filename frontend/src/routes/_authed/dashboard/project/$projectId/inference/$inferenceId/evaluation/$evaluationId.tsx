@@ -22,7 +22,7 @@ function RouteComponent() {
     from: "/_authed/dashboard/project/$projectId/inference/$inferenceId/evaluation/$evaluationId",
   });
   const { data } = useQuery({
-    queryKey: ["evaluation-dataview"],
+    queryKey: ["evaluation-dataview", evaluationId],
     queryFn: async () => {
       const response = await axios.get("api/evaluation/dataview", {
         withCredentials: true,
@@ -31,6 +31,10 @@ function RouteComponent() {
         },
       });
       return response.data;
+    },
+    refetchInterval: (query) => {
+      const status = query.state.data?.meta?.status;
+      return status === "pending" || status === "processing" ? 2000 : false;
     },
   });
   const datasetExampleCount =

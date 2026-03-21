@@ -12,7 +12,7 @@ export function EvaluationsList() {
     from: "/_authed/dashboard/project/$projectId/inference/$inferenceId/evaluation/",
   });
   const { isPending, isError, data, error } = useQuery({
-    queryKey: ["evaluations"],
+    queryKey: ["evaluations", projectId, inferenceId],
     queryFn: () => {
       return axios.get("api/evaluation/list", {
         withCredentials: true,
@@ -21,6 +21,15 @@ export function EvaluationsList() {
           inferenceId,
         },
       });
+    },
+    refetchInterval: (query) => {
+      const evaluations = query.state.data?.data?.evaluations;
+      const hasRunningEvaluations = Array.isArray(evaluations) && evaluations.some(
+        (evaluation: { status?: string }) =>
+          evaluation.status === "pending" || evaluation.status === "processing"
+      );
+
+      return hasRunningEvaluations ? 2000 : false;
     },
   });
 

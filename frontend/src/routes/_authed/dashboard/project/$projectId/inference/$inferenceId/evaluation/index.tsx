@@ -26,6 +26,10 @@ function RouteComponent() {
       });
       return data.meta;
     },
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "pending" || status === "processing" ? 2000 : false;
+    },
   });
   const datasetExampleCount = meta?.totalExamples ?? meta?.processedExamples ?? 0;
 

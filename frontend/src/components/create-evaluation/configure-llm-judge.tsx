@@ -56,9 +56,22 @@ const getDefaultPrompt = (criterion: string) => RUBRICS[criterion];
 const DEFAULT_CONFIG_BASE = {
   model: "gpt-4o",
   temperature: 0.0,
+  reasoningEffort: "medium",
   maxTokens: 256,
   scale: 5,
 };
+
+function isGpt5Family(model: string) {
+  return model.startsWith("gpt-5");
+}
+
+function getReasoningEffortOptions(model: string) {
+  if (model === "gpt-5") {
+    return ["minimal", "low", "medium", "high"];
+  }
+
+  return ["none", "low", "medium", "high", "xhigh"];
+}
 
 export function getDefaultConfig(criterion: string) {
   return { ...DEFAULT_CONFIG_BASE, prompt: getDefaultPrompt(criterion) };
@@ -72,9 +85,9 @@ export function ConfigureLLMJudge({ metricId, form, initialConfig }: { metricId:
   const [config, setConfig] = useState(initialConfig || defaultConfig);
 
   const handleSave = () => {
-    // Remove temperature from config if using GPT-5
-    const configToSave = config.model === "gpt-5" 
-      ? { ...config, temperature: undefined } 
+    // GPT-5 family models use reasoning_effort instead of temperature.
+    const configToSave = isGpt5Family(config.model)
+      ? { ...config, temperature: undefined }
       : config;
     form.setValue(`llmJudgeConfig.${metricId}`, configToSave);
     setOpen(false);
@@ -94,20 +107,51 @@ export function ConfigureLLMJudge({ metricId, form, initialConfig }: { metricId:
         <div className="space-y-6">
           <div className="space-y-3">
             <Label className="text-base font-medium">Model</Label>
-            <Select value={config.model} onValueChange={(v) => setConfig({ ...config, model: v })}>
+            <Select
+              value={config.model}
+              onValueChange={(v) => {
+                const allowedEfforts = getReasoningEffortOptions(v);
+                setConfig({
+                  ...config,
+                  model: v,
+                  reasoningEffort: allowedEfforts.includes(config.reasoningEffort)
+                    ? config.reasoningEffort
+                    : "medium",
+                });
+              }}
+            >
               <SelectTrigger className="h-11">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="gpt-4o">GPT-4o</SelectItem>
                 <SelectItem value="gpt-5">GPT-5</SelectItem>
+                <SelectItem value="gpt-5.4">GPT-5.4</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          {config.model !== "gpt-5" && (
+          {!isGpt5Family(config.model) && (
             <div className="space-y-3">
               <Label className="text-base font-medium">Temperature</Label>
               <Input type="number" step="0.1" min="0" max="2" value={config.temperature} onChange={(e) => setConfig({ ...config, temperature: parseFloat(e.target.value) })} className="h-11" />
+            </div>
+          )}
+          {isGpt5Family(config.model) && (
+            <div className="space-y-3">
+              <Label className="text-base font-medium">Reasoning Effort</Label>
+              <Select
+                value={config.reasoningEffort ?? "medium"}
+                onValueChange={(v) => setConfig({ ...config, reasoningEffort: v })}
+              >
+                <SelectTrigger className="h-11">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {getReasoningEffortOptions(config.model).map((effort) => (
+                    <SelectItem key={effort} value={effort}>{effort}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
           <div className="space-y-3">

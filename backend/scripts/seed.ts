@@ -741,9 +741,9 @@ const providers = [
           id: "reasoning_effort",
           name: "Reasoning effort",
           description:
-            "For reasoning models (o1, o3, o3-mini, o4-mini, gpt-5, gpt-5.4): none, low, medium, high, or xhigh. Higher = more reasoning tokens.",
+            "For Azure reasoning models, allowed values are model-specific. gpt-5 uses minimal, low, medium, or high. o1, o3, o3-mini, and o4-mini use low, medium, or high. gpt-5.4 keeps none, low, medium, high, or xhigh.",
           schema: z.toJSONSchema(
-            z.enum(["none", "low", "medium", "high", "xhigh"])
+            z.enum(["minimal", "none", "low", "medium", "high", "xhigh"])
           ),
           defaultValue: "medium",
         },

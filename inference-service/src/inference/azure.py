@@ -21,6 +21,17 @@ _ALLOWED_ADVANCED = {
 }
 
 
+def get_reasoning_effort_options(model_name: str) -> set[str]:
+  normalized = model_name.lower()
+  if normalized == "gpt-5":
+    return {"minimal", "low", "medium", "high"}
+
+  if normalized in {"o1", "o3", "o3-mini", "o4-mini"}:
+    return {"low", "medium", "high"}
+
+  return {"none", "low", "medium", "high", "xhigh"}
+
+
 def format_parameters(
   model_name: str, raw_list: List[Dict[str, any]]
 ) -> Dict[str, any]:
@@ -42,6 +53,12 @@ def format_parameters(
       params["max_completion_tokens"] = params.pop("max_tokens")
     allowed = {"max_completion_tokens", "reasoning_effort"}
     params = {k: v for k, v in params.items() if k in allowed}
+    if "reasoning_effort" in params:
+      allowed_efforts = get_reasoning_effort_options(model_name)
+      if params["reasoning_effort"] not in allowed_efforts:
+        raise ValueError(
+          f"reasoning_effort '{params['reasoning_effort']}' is not supported for {model_name}"
+        )
     if "max_completion_tokens" not in params:
       params["max_completion_tokens"] = 4096
   else:

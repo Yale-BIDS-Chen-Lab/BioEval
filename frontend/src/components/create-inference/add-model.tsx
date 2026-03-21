@@ -106,6 +106,30 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
 const AZURE_REASONING_PARAM_IDS = ["max_tokens", "reasoning_effort"];
 
+function getAzureReasoningEffortOptions(model: string | undefined) {
+  if (model === "gpt-5") {
+    return ["minimal", "low", "medium", "high"];
+  }
+
+  if (["o1", "o3", "o3-mini", "o4-mini"].includes(model ?? "")) {
+    return ["low", "medium", "high"];
+  }
+
+  return ["none", "low", "medium", "high", "xhigh"];
+}
+
+function getAzureReasoningEffortDescription(model: string | undefined) {
+  if (model === "gpt-5") {
+    return "For gpt-5: minimal, low, medium, or high.";
+  }
+
+  if (["o1", "o3", "o3-mini", "o4-mini"].includes(model ?? "")) {
+    return `For ${model}: low, medium, or high.`;
+  }
+
+  return "For this model: none, low, medium, high, or xhigh.";
+}
+
 function isAzureReasoningModel(currentProvider: any, model: string | undefined) {
   if (currentProvider?.providerId !== "azure" || !model) return false;
 
@@ -143,6 +167,18 @@ function AddModelPopup({ form, onAdd, providers }) {
     );
     form.setValue("parameters", defaults, { shouldValidate: false });
   }, [providerId]);
+
+  useEffect(() => {
+    if (!isAzureReasoning) return;
+
+    const allowedOptions = getAzureReasoningEffortOptions(model);
+    const currentValue = form.getValues("parameters.reasoning_effort");
+    if (currentValue && !allowedOptions.includes(currentValue)) {
+      form.setValue("parameters.reasoning_effort", "medium", {
+        shouldValidate: false,
+      });
+    }
+  }, [form, isAzureReasoning, model]);
 
   // Clear/restore sampling parameters when do_sample changes
   useEffect(() => {
@@ -251,10 +287,10 @@ function AddModelPopup({ form, onAdd, providers }) {
             {visibleParameters.map((p) => {
               const schema = p.schema ?? {};
               const isBoolean = schema.type === "boolean";
-              const enumOptions = Array.isArray(schema.enum)
-                ? (schema.enum as string[])
-                : p.id === "reasoning_effort"
-                  ? ["none", "low", "medium", "high", "xhigh"]
+              const enumOptions = p.id === "reasoning_effort"
+                ? getAzureReasoningEffortOptions(model)
+                : Array.isArray(schema.enum)
+                  ? (schema.enum as string[])
                   : null;
               const isEnum = enumOptions !== null && enumOptions.length > 0;
               
@@ -280,7 +316,9 @@ function AddModelPopup({ form, onAdd, providers }) {
                             </span>
                           </TooltipTrigger>
                           <TooltipContent className="max-w-xs text-xs">
-                            {p.description}
+                            {p.id === "reasoning_effort"
+                              ? getAzureReasoningEffortDescription(model)
+                              : p.description}
                           </TooltipContent>
                         </Tooltip>
                       </div>

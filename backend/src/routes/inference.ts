@@ -48,6 +48,18 @@ import { deleteNotesByInference } from "../db/queries/note";
 
 const router = express.Router();
 
+function getAzureReasoningEffortOptions(modelName: string) {
+  if (modelName === "gpt-5") {
+    return ["minimal", "low", "medium", "high"];
+  }
+
+  if (["o1", "o3", "o3-mini", "o4-mini"].includes(modelName)) {
+    return ["low", "medium", "high"];
+  }
+
+  return ["none", "low", "medium", "high", "xhigh"];
+}
+
 router.post(
   "/create",
   ...validatedRoute(
@@ -93,6 +105,25 @@ router.post(
         }
 
         for (const argument of modelQuery.parameters) {
+          if (
+            modelQuery.provider === "azure" &&
+            argument.id === "reasoning_effort"
+          ) {
+            const allowedValues = getAzureReasoningEffortOptions(
+              modelQuery.model
+            );
+            if (
+              typeof argument.value !== "string" ||
+              !allowedValues.includes(argument.value)
+            ) {
+              return res.status(StatusCodes.BAD_REQUEST).json({
+                success: false,
+                error: `Invalid value ${argument.value} for ${argument.id} in ${modelQuery.model}`,
+              });
+            }
+            continue;
+          }
+
           const param = model.parameters.find((p) => p.id == argument.id);
           if (!param) {
             return res.status(StatusCodes.NOT_FOUND).json({

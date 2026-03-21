@@ -687,6 +687,8 @@ const providers = [
       "meta-llama/Llama-3.2-1B-Instruct",
       "meta-llama/Llama-3.2-3B",
       "meta-llama/Llama-3.2-3B-Instruct",
+      "Qwen/Qwen2.5-7B-Instruct",
+      "google/medgemma-1.5-4b-it",
       "google/medgemma-4b-it",
     ],
   },

@@ -60,6 +60,11 @@ function formatMetricName(metric: string) {
   const normalized = metric.toLowerCase();
   const names: Record<string, string> = {
     accuracy: "Accuracy",
+    macro_f1: "Macro-F1",
+    micro_f1: "Micro-F1",
+    precision: "Precision",
+    recall: "Recall",
+    f1: "F1",
     bertscore: "BERTScore",
     bartscore: "BARTScore",
     meteor: "METEOR",
@@ -200,10 +205,13 @@ export function InferenceEvaluationSummary({
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <button className="hover:bg-muted/50 flex w-[210px] min-w-[210px] max-w-[210px] flex-col items-start gap-1 overflow-hidden rounded-md border px-3 py-2 text-left transition-colors">
+        <button className="hover:bg-muted/50 flex h-[76px] w-[210px] min-w-[210px] max-w-[210px] flex-col items-start gap-1 overflow-hidden rounded-md border px-3 py-2 text-left transition-colors">
           <div className="flex w-full items-center gap-2 overflow-hidden">
             <span className="truncate text-sm font-medium leading-tight">
               {summary.count} eval{summary.count === 1 ? "" : "s"}
+            </span>
+            <span className="text-muted-foreground shrink-0 text-[10px] font-medium tracking-wide uppercase">
+              Latest
             </span>
             {summary.hasRunningEvaluations && (
               <Badge variant="outline" className="shrink-0 text-[10px]">
@@ -211,27 +219,38 @@ export function InferenceEvaluationSummary({
               </Badge>
             )}
           </div>
-          {summary.latestCompleted ? (
-            latestMetrics.length > 0 ? (
-              <div className="text-muted-foreground w-full overflow-hidden text-xs leading-4 break-words">
-                Latest:{" "}
-                {latestMetrics
-                  .map(
-                    (metric) =>
-                      `${metric.label} ${formatMetricValue(metric.value)}`
-                  )
-                  .join(", ")}
-              </div>
+          <div className="min-h-[32px] w-full space-y-0.5 overflow-hidden">
+            {summary.latestCompleted && latestMetrics.length > 0 ? (
+              <>
+                {latestMetrics.map((metric) => (
+                  <div
+                    key={metric.key}
+                    className="text-muted-foreground w-full truncate text-xs leading-4"
+                    title={`${metric.label} ${formatMetricValue(metric.value)}`}
+                  >
+                    {metric.label} {formatMetricValue(metric.value)}
+                  </div>
+                ))}
+                {latestMetrics.length < 2 && (
+                  <div className="invisible text-xs leading-4">placeholder</div>
+                )}
+              </>
+            ) : summary.latestCompleted ? (
+              <>
+                <div className="text-muted-foreground w-full truncate text-xs leading-4">
+                  Latest evaluation completed
+                </div>
+                <div className="invisible text-xs leading-4">placeholder</div>
+              </>
             ) : (
-              <div className="text-muted-foreground w-full overflow-hidden text-xs leading-4 break-words">
-                Latest evaluation completed
-              </div>
-            )
-          ) : (
-            <div className="text-muted-foreground w-full overflow-hidden text-xs leading-4 break-words">
-              No completed evaluation yet
-            </div>
-          )}
+              <>
+                <div className="text-muted-foreground w-full truncate text-xs leading-4">
+                  No completed evaluation yet
+                </div>
+                <div className="invisible text-xs leading-4">placeholder</div>
+              </>
+            )}
+          </div>
         </button>
       </SheetTrigger>
       <SheetContent className="sm:max-w-2xl">

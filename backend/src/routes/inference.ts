@@ -59,6 +59,12 @@ type LatestCompletedEvaluationSummary = {
   aggregate: AggregateMetrics;
 } | null;
 
+type DatasetPlacementSummary = {
+  tier: "gold" | "silver" | "bronze";
+  metricKey: string;
+  value: number;
+} | null;
+
 function getAzureReasoningEffortOptions(modelName: string) {
   if (modelName === "gpt-5") {
     return ["minimal", "low", "medium", "high"];
@@ -129,6 +135,43 @@ function normalizeMetricList(metrics: unknown): string[] {
   return metrics.filter((metric): metric is string => typeof metric === "string");
 }
 
+function getPrimaryMetricKey(taskName: string) {
+  switch (taskName) {
+    case "Named-entity Recognition":
+      return "exact_match_f1";
+    case "Multiple Choice Questions":
+      return "accuracy";
+    case "Multi-label Classification":
+      return "macro_f1";
+    case "Single-label Classification":
+      return "macro_f1";
+    case "Generation":
+      return "rougel";
+    default:
+      return null;
+  }
+}
+
+function getAggregateMetricValue(
+  aggregate: AggregateMetrics,
+  metricKey: string
+): number | null {
+  const directValue = aggregate[metricKey];
+  if (typeof directValue === "number" && Number.isFinite(directValue)) {
+    return directValue;
+  }
+
+  const matchedEntry = Object.entries(aggregate).find(
+    ([key]) => key.toLowerCase() === metricKey.toLowerCase()
+  );
+  if (!matchedEntry) {
+    return null;
+  }
+
+  const [, value] = matchedEntry;
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 async function readEvaluationAggregate(
   evaluationObjectKey: string
 ): Promise<AggregateMetrics> {
@@ -153,7 +196,8 @@ async function readEvaluationAggregate(
 }
 
 async function buildInferenceEvaluationSummary(
-  evaluations: InferenceEvaluationRow[]
+  evaluations: InferenceEvaluationRow[],
+  taskName: string
 ) {
   const orderedEvaluations = sortEvaluationsByCreatedAtDesc(evaluations);
   const latestCompleted = orderedEvaluations.find(
@@ -161,23 +205,53 @@ async function buildInferenceEvaluationSummary(
   );
 
   let latestCompletedSummary: LatestCompletedEvaluationSummary = null;
-  if (latestCompleted?.objectKey) {
+  const primaryMetricKey = getPrimaryMetricKey(taskName);
+  let primaryMetricBest:
+    | {
+        metricKey: string;
+        value: number;
+      }
+    | null = null;
+
+  const completedEvaluations = orderedEvaluations.filter(
+    (evaluation) => evaluation.status === "done" && evaluation.objectKey
+  );
+
+  for (const evaluation of completedEvaluations) {
     let aggregate: AggregateMetrics = {};
     try {
-      aggregate = await readEvaluationAggregate(latestCompleted.objectKey);
+      aggregate = await readEvaluationAggregate(evaluation.objectKey!);
     } catch (error) {
       console.error(
-        `Failed to read aggregate for evaluation ${latestCompleted.evaluationId}:`,
+        `Failed to read aggregate for evaluation ${evaluation.evaluationId}:`,
         error
       );
     }
 
-    latestCompletedSummary = {
-      evaluationId: latestCompleted.evaluationId,
-      createdAt: latestCompleted.createdAt ?? null,
-      metrics: normalizeMetricList(latestCompleted.metrics),
-      aggregate,
-    };
+    if (evaluation.evaluationId === latestCompleted?.evaluationId) {
+      latestCompletedSummary = {
+        evaluationId: evaluation.evaluationId,
+        createdAt: evaluation.createdAt ?? null,
+        metrics: normalizeMetricList(evaluation.metrics),
+        aggregate,
+      };
+    }
+
+    if (!primaryMetricKey) {
+      continue;
+    }
+
+    const metricValue = getAggregateMetricValue(aggregate, primaryMetricKey);
+    if (metricValue === null) {
+      continue;
+    }
+
+    if (!primaryMetricBest || metricValue > primaryMetricBest.value) {
+      primaryMetricBest = {
+        metricKey: primaryMetricKey,
+        value: metricValue,
+      };
+    }
   }
 
   return {
@@ -187,6 +261,7 @@ async function buildInferenceEvaluationSummary(
         evaluation.status === "pending" || evaluation.status === "processing"
     ),
     latestCompleted: latestCompletedSummary,
+    primaryMetricBest,
   };
 }
 
@@ -314,7 +389,7 @@ router.get(
       }
 
       const projectInferences = await getProjectInferences(req.query.projectId);
-      const inferences = await Promise.all(
+      const inferencesWithSummary = await Promise.all(
         projectInferences.map(async (projectInference) => {
           const evaluations = await getInferenceEvaluations(
             projectInference.inferenceId,
@@ -324,11 +399,71 @@ router.get(
           return {
             ...projectInference,
             evaluationSummary: await buildInferenceEvaluationSummary(
-              evaluations
+              evaluations,
+              projectInference.task ?? ""
             ),
           };
         })
       );
+
+      const placementsByInference = new Map<
+        string,
+        NonNullable<DatasetPlacementSummary>
+      >();
+
+      const inferencesByDataset = new Map<
+        string,
+        Array<{
+          inferenceId: string;
+          metricKey: string;
+          value: number;
+        }>
+      >();
+
+      for (const inference of inferencesWithSummary) {
+        const primaryMetricBest = inference.evaluationSummary?.primaryMetricBest;
+        if (!primaryMetricBest) {
+          continue;
+        }
+
+        const group = inferencesByDataset.get(inference.datasetId) ?? [];
+        group.push({
+          inferenceId: inference.inferenceId,
+          metricKey: primaryMetricBest.metricKey,
+          value: primaryMetricBest.value,
+        });
+        inferencesByDataset.set(inference.datasetId, group);
+      }
+
+      for (const rankedInferences of inferencesByDataset.values()) {
+        rankedInferences.sort((a, b) => {
+          if (b.value !== a.value) {
+            return b.value - a.value;
+          }
+          return a.inferenceId.localeCompare(b.inferenceId);
+        });
+
+        const tiers: Array<NonNullable<DatasetPlacementSummary>["tier"]> = [
+          "gold",
+          "silver",
+          "bronze",
+        ];
+
+        rankedInferences.slice(0, 3).forEach((inference, index) => {
+          placementsByInference.set(inference.inferenceId, {
+            tier: tiers[index],
+            metricKey: inference.metricKey,
+            value: inference.value,
+          });
+        });
+      }
+
+      const inferences = inferencesWithSummary.map((inference) => ({
+        ...inference,
+        datasetPlacement:
+          placementsByInference.get(inference.inferenceId) ??
+          (null as DatasetPlacementSummary),
+      }));
 
       res.json({ success: true, inferences });
     },

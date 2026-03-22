@@ -6,9 +6,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 cd "$SCRIPT_DIR"
 
-export INFERENCE_SERVICE_URL="${INFERENCE_SERVICE_URL:-http://host.docker.internal:8000}"
-
-docker compose up --build \
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.host-native.yml \
+  up --build \
   db \
   rabbitmq \
   minio \

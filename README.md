@@ -64,6 +64,9 @@ Important:
    cd docker-files
    ./start-macos-host-stack.sh
    ```
+   This script uses `docker-compose.host-native.yml` so the Docker `backend`
+   talks to the macOS host `inference-service` at `http://host.docker.internal:8000`
+   instead of the Docker `inference` service.
 3. In a second terminal, start `inference-service` on macOS:
    ```bash
    cd inference-service

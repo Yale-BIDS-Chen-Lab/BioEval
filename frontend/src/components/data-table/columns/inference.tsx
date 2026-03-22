@@ -242,7 +242,7 @@ export const columns: ColumnDef<Inference>[] = [
   {
     id: "datasetPlacement",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Dataset Rank" />
+      <DataTableColumnHeader column={column} title="Rank (within dataset)" />
     ),
     cell: ({ row }) => {
       const placement = row.original.datasetPlacement;

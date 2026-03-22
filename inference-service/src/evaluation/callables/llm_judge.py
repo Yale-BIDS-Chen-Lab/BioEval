@@ -34,7 +34,7 @@ def llm_judge_metric(
         )
         model = config.get("model", "gpt-4o")
         temperature = config.get("temperature", 0.0)
-        max_tokens = config.get("maxTokens", 256)
+        max_tokens = config.get("maxTokens", 4096)
         reasoning_effort = config.get("reasoningEffort")
         scale = config.get("scale", 5)
         prompt_template = config["prompt"]

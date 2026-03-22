@@ -57,7 +57,7 @@ const DEFAULT_CONFIG_BASE = {
   model: "gpt-4o",
   temperature: 0.0,
   reasoningEffort: "medium",
-  maxTokens: 256,
+  maxTokens: 4096,
   scale: 5,
 };
 

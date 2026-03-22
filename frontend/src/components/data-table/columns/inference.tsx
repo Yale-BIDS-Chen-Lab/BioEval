@@ -147,7 +147,6 @@ export const columns: ColumnDef<Inference>[] = [
         </Badge>
       );
     },
-    enableSorting: false,
     enableHiding: false,
   },
   {
@@ -163,7 +162,6 @@ export const columns: ColumnDef<Inference>[] = [
         </div>
       );
     },
-    enableSorting: false,
     enableHiding: false,
   },
   {

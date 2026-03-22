@@ -37,9 +37,18 @@ export const inferenceSchema = z.object({
   isFavorite: z.boolean().optional(),
   createdAt: z.string().nullable().optional(),
   task: z.string().optional(),
+  datasetId: z.string().optional(),
   dataset: z.string().optional(),
   totalExamples: z.number().nullable().optional(),
   processedExamples: z.number().nullable().optional(),
+  datasetPlacement: z
+    .object({
+      tier: z.enum(["gold", "silver", "bronze"]),
+      metricKey: z.string().nonempty(),
+      value: z.number(),
+    })
+    .nullable()
+    .optional(),
   evaluationSummary: z
     .object({
       count: z.number(),
@@ -52,6 +61,13 @@ export const inferenceSchema = z.object({
           aggregate: z.record(z.string(), z.number()),
         })
         .nullable(),
+      primaryMetricBest: z
+        .object({
+          metricKey: z.string().nonempty(),
+          value: z.number(),
+        })
+        .nullable()
+        .optional(),
     })
     .optional(),
 });

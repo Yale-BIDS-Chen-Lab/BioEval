@@ -32,6 +32,54 @@ function formatCreatedAt(value: string | null | undefined) {
   }).format(date);
 }
 
+function formatPlacementMetricName(metric: string) {
+  const normalized = metric.toLowerCase();
+  const names: Record<string, string> = {
+    accuracy: "Accuracy",
+    macro_f1: "Macro-F1",
+    exact_match_f1: "Exact Match F1",
+    rougel: "ROUGE-L",
+  };
+
+  return names[normalized] ?? metric;
+}
+
+function placementMeta(
+  tier: "gold" | "silver" | "bronze"
+): {
+  label: string;
+  icon: string;
+  textClassName: string;
+} {
+  switch (tier) {
+    case "gold":
+      return {
+        label: "Gold",
+        icon: "🥇",
+        textClassName: "text-amber-700 dark:text-amber-300",
+      };
+    case "silver":
+      return {
+        label: "Silver",
+        icon: "🥈",
+        textClassName: "text-slate-700 dark:text-slate-300",
+      };
+    case "bronze":
+      return {
+        label: "Bronze",
+        icon: "🥉",
+        textClassName: "text-orange-700 dark:text-orange-300",
+      };
+  }
+}
+
+function formatPlacementMetricValue(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    maximumSignificantDigits: 4,
+    useGrouping: false,
+  }).format(value);
+}
+
 export const columns: ColumnDef<Inference>[] = [
   {
     id: "select",
@@ -189,6 +237,44 @@ export const columns: ColumnDef<Inference>[] = [
         </div>
       );
     },
+    enableHiding: false,
+  },
+  {
+    id: "datasetPlacement",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Dataset Rank" />
+    ),
+    cell: ({ row }) => {
+      const placement = row.original.datasetPlacement;
+      if (!placement) {
+        return <div className="text-muted-foreground text-sm">-</div>;
+      }
+
+      const meta = placementMeta(placement.tier);
+      const datasetName = row.original.dataset ?? "dataset";
+
+      return (
+        <div
+          className="flex min-w-[180px] flex-col gap-0.5"
+          title={`${meta.label} on ${datasetName} by ${formatPlacementMetricName(
+            placement.metricKey
+          )} ${formatPlacementMetricValue(placement.value)}`}
+        >
+          <div
+            className={`truncate text-xs font-medium leading-4 ${meta.textClassName}`}
+          >
+            {meta.icon} {meta.label} on {datasetName}
+          </div>
+          <div
+            className="text-muted-foreground text-[11px] leading-4"
+          >
+            {formatPlacementMetricName(placement.metricKey)}{" "}
+            {formatPlacementMetricValue(placement.value)}
+          </div>
+        </div>
+      );
+    },
+    enableSorting: false,
     enableHiding: false,
   },
   {

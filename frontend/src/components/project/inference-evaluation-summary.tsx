@@ -25,6 +25,10 @@ type EvaluationSummary = {
     metrics: string[];
     aggregate: AggregateMetrics;
   } | null;
+  primaryMetricBest?: {
+    metricKey: string;
+    value: number;
+  } | null;
 };
 
 type DetailedEvaluation = {
@@ -95,6 +99,9 @@ function preferredMetricOrder(taskName: string) {
       return ["accuracy"];
     case "Named-entity Recognition":
       return ["exact_match_f1", "exact_match_precision", "exact_match_recall"];
+    case "Multi-label Classification":
+    case "Single-label Classification":
+      return ["macro_f1", "accuracy"];
     case "Generation":
       return [
         "rougel",

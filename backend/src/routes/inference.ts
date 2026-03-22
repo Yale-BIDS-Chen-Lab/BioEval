@@ -48,6 +48,17 @@ import { deleteNotesByInference } from "../db/queries/note";
 
 const router = express.Router();
 
+type AggregateMetrics = Record<string, number>;
+type InferenceEvaluationRow = Awaited<
+  ReturnType<typeof getInferenceEvaluations>
+>[number];
+type LatestCompletedEvaluationSummary = {
+  evaluationId: string;
+  createdAt: string | null;
+  metrics: string[];
+  aggregate: AggregateMetrics;
+} | null;
+
 function getAzureReasoningEffortOptions(modelName: string) {
   if (modelName === "gpt-5") {
     return ["minimal", "low", "medium", "high"];
@@ -58,6 +69,125 @@ function getAzureReasoningEffortOptions(modelName: string) {
   }
 
   return ["none", "low", "medium", "high", "xhigh"];
+}
+
+function sortEvaluationsByCreatedAtDesc(
+  evaluations: InferenceEvaluationRow[]
+): InferenceEvaluationRow[] {
+  return [...evaluations].sort((a, b) => {
+    const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return bTime - aTime;
+  });
+}
+
+function normalizeAggregateMetrics(aggregate: unknown): AggregateMetrics {
+  if (!aggregate) {
+    return {};
+  }
+
+  if (Array.isArray(aggregate)) {
+    return aggregate.reduce<AggregateMetrics>((acc, item) => {
+      if (
+        item &&
+        typeof item === "object" &&
+        "key" in item &&
+        "value" in item &&
+        typeof item.key === "string"
+      ) {
+        const numericValue =
+          typeof item.value === "number" ? item.value : Number(item.value);
+        if (Number.isFinite(numericValue)) {
+          acc[item.key] = numericValue;
+        }
+      }
+      return acc;
+    }, {});
+  }
+
+  if (typeof aggregate === "object") {
+    return Object.entries(aggregate as Record<string, unknown>).reduce<
+      AggregateMetrics
+    >((acc, [key, value]) => {
+      const numericValue =
+        typeof value === "number" ? value : Number(value);
+      if (Number.isFinite(numericValue)) {
+        acc[key] = numericValue;
+      }
+      return acc;
+    }, {});
+  }
+
+  return {};
+}
+
+function normalizeMetricList(metrics: unknown): string[] {
+  if (!Array.isArray(metrics)) {
+    return [];
+  }
+
+  return metrics.filter((metric): metric is string => typeof metric === "string");
+}
+
+async function readEvaluationAggregate(
+  evaluationObjectKey: string
+): Promise<AggregateMetrics> {
+  const s3conn = await new S3Connection().connect();
+
+  try {
+    await s3conn.createTable(
+      "evaluation",
+      evaluationObjectKey,
+      "evaluation_summary"
+    );
+    const aggregateResult = await s3conn.con.runAndReadAll(`
+      SELECT aggregate
+      FROM evaluation_summary
+      LIMIT 1
+    `);
+    const aggregateRow = aggregateResult.getRowObjectsJS()[0];
+    return normalizeAggregateMetrics(aggregateRow?.aggregate);
+  } finally {
+    await s3conn.dispose();
+  }
+}
+
+async function buildInferenceEvaluationSummary(
+  evaluations: InferenceEvaluationRow[]
+) {
+  const orderedEvaluations = sortEvaluationsByCreatedAtDesc(evaluations);
+  const latestCompleted = orderedEvaluations.find(
+    (evaluation) => evaluation.status === "done" && evaluation.objectKey
+  );
+
+  let latestCompletedSummary: LatestCompletedEvaluationSummary = null;
+  if (latestCompleted?.objectKey) {
+    let aggregate: AggregateMetrics = {};
+    try {
+      aggregate = await readEvaluationAggregate(latestCompleted.objectKey);
+    } catch (error) {
+      console.error(
+        `Failed to read aggregate for evaluation ${latestCompleted.evaluationId}:`,
+        error
+      );
+    }
+
+    latestCompletedSummary = {
+      evaluationId: latestCompleted.evaluationId,
+      createdAt: latestCompleted.createdAt ?? null,
+      metrics: normalizeMetricList(latestCompleted.metrics),
+      aggregate,
+    };
+  }
+
+  return {
+    count: evaluations.length,
+    hasRunningEvaluations: evaluations.some(
+      (evaluation) =>
+        evaluation.status === "pending" || evaluation.status === "processing"
+    ),
+    latestCompleted: latestCompletedSummary,
+  };
 }
 
 router.post(
@@ -184,7 +314,99 @@ router.get(
       }
 
       const projectInferences = await getProjectInferences(req.query.projectId);
-      res.json({ success: true, inferences: projectInferences });
+      const inferences = await Promise.all(
+        projectInferences.map(async (projectInference) => {
+          const evaluations = await getInferenceEvaluations(
+            projectInference.inferenceId,
+            req.user.id
+          );
+
+          return {
+            ...projectInference,
+            evaluationSummary: await buildInferenceEvaluationSummary(
+              evaluations
+            ),
+          };
+        })
+      );
+
+      res.json({ success: true, inferences });
+    },
+    "query"
+  )
+);
+
+const getInferenceEvaluationSummarySchema = z.object({
+  projectId: z.string().nonempty(),
+  inferenceId: z.string().nonempty(),
+});
+
+router.get(
+  "/evaluation-summary",
+  ...validatedRoute(
+    getInferenceEvaluationSummarySchema,
+    async (req, res) => {
+      const validProject = await projectExists(
+        req.query.projectId,
+        req.user.id
+      );
+      if (!validProject) {
+        return res
+          .status(StatusCodes.NOT_FOUND)
+          .json({ success: false, error: "Project doesn't exist" });
+      }
+
+      const validInference = await inferenceExists(
+        req.query.inferenceId,
+        req.user.id
+      );
+      if (!validInference) {
+        return res
+          .status(StatusCodes.NOT_FOUND)
+          .json({ success: false, error: "Inference doesn't exist" });
+      }
+
+      const evaluations = sortEvaluationsByCreatedAtDesc(
+        await getInferenceEvaluations(req.query.inferenceId, req.user.id)
+      );
+
+      const detailedEvaluations = await Promise.all(
+        evaluations.map(async (evaluation) => {
+          let aggregate: AggregateMetrics | null = null;
+          if (evaluation.status === "done" && evaluation.objectKey) {
+            try {
+              aggregate = await readEvaluationAggregate(evaluation.objectKey);
+            } catch (error) {
+              console.error(
+                `Failed to read aggregate for evaluation ${evaluation.evaluationId}:`,
+                error
+              );
+              aggregate = {};
+            }
+          }
+
+          return {
+            evaluationId: evaluation.evaluationId,
+            status: evaluation.status,
+            metrics: normalizeMetricList(evaluation.metrics),
+            createdAt: evaluation.createdAt ?? null,
+            aggregate,
+          };
+        })
+      );
+
+      res.json({
+        success: true,
+        summary: {
+          count: detailedEvaluations.length,
+          hasRunningEvaluations: detailedEvaluations.some(
+            (evaluation) =>
+              evaluation.status === "pending" ||
+              evaluation.status === "processing"
+          ),
+          evaluations: detailedEvaluations,
+        },
+      });
     },
     "query"
   )

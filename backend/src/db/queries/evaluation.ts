@@ -48,6 +48,7 @@ export async function getInferenceEvaluations(
           evaluationId: evaluation.evaluationId,
           status: evaluation.status,
           metrics: evaluation.metrics,
+          objectKey: evaluation.objectKey,
           createdAt: evaluation.createdAt,
         })
         .from(evaluation)
@@ -76,6 +77,7 @@ export async function getInferenceEvaluations(
       evaluationId: evaluation.evaluationId,
       status: evaluation.status,
       metrics: evaluation.metrics,
+      objectKey: evaluation.objectKey,
     })
     .from(evaluation)
     .where(
@@ -85,7 +87,10 @@ export async function getInferenceEvaluations(
       )
     );
 
-  return rows.map((row) => ({ ...row, createdAt: null as string | null }));
+  return rows.map((row) => ({
+    ...row,
+    createdAt: null as string | null,
+  }));
 }
 
 export async function getEvaluationObject(

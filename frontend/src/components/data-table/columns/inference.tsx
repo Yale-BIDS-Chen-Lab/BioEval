@@ -178,16 +178,19 @@ export const columns: ColumnDef<Inference>[] = [
     cell: ({ row }) => {
       const taskName = row.getValue("task") as string;
       
-      // Color coding for different task types (same as datasets page)
+      // Keep task hues for quick scanning, but tone them down so the table
+      // stays visually calm next to provider logos and rank badges.
       const taskColors: Record<string, string> = {
-        "Multiple Choice Questions": "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
-        "Named-entity Recognition": "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20",
-        "Relation Extraction": "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20",
-        "Multi-label Classification": "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20",
-        "Generation": "bg-pink-500/10 text-pink-700 dark:text-pink-400 border-pink-500/20",
+        "Multiple Choice Questions": "bg-sky-500/8 text-slate-700 dark:text-slate-200 border-sky-500/15",
+        "Named-entity Recognition": "bg-emerald-500/8 text-slate-700 dark:text-slate-200 border-emerald-500/15",
+        "Relation Extraction": "bg-violet-500/8 text-slate-700 dark:text-slate-200 border-violet-500/15",
+        "Multi-label Classification": "bg-amber-500/8 text-slate-700 dark:text-slate-200 border-amber-500/15",
+        "Generation": "bg-rose-500/8 text-slate-700 dark:text-slate-200 border-rose-500/15",
       };
 
-      const taskColorClass = taskColors[taskName] || "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20";
+      const taskColorClass =
+        taskColors[taskName] ||
+        "bg-slate-500/8 text-slate-700 dark:text-slate-200 border-slate-500/15";
 
       return (
         <Badge variant="outline" className={taskColorClass}>

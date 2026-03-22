@@ -60,23 +60,24 @@ function RouteComponent() {
     const queryClient = useQueryClient();
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-    // Refined, muted color coding for task types (softer contrast, premium feel)
+    // Match the softer task badge treatment used in My Inferences so task
+    // cues stay helpful without turning the page into a rainbow.
     const taskColors: Record<string, string> = {
       "Multiple Choice Questions":
-        "bg-sky-500/5 text-sky-600 dark:text-sky-400/90 border-sky-400/15 dark:border-sky-500/20",
+        "bg-sky-500/8 text-slate-700 dark:text-slate-200 border-sky-500/15",
       "Named-entity Recognition":
-        "bg-emerald-500/5 text-emerald-600 dark:text-emerald-400/90 border-emerald-400/15 dark:border-emerald-500/20",
+        "bg-emerald-500/8 text-slate-700 dark:text-slate-200 border-emerald-500/15",
       "Relation Extraction":
-        "bg-violet-500/5 text-violet-600 dark:text-violet-400/90 border-violet-400/15 dark:border-violet-500/20",
+        "bg-violet-500/8 text-slate-700 dark:text-slate-200 border-violet-500/15",
       "Multi-label Classification":
-        "bg-amber-500/5 text-amber-600 dark:text-amber-400/90 border-amber-400/15 dark:border-amber-500/20",
+        "bg-amber-500/8 text-slate-700 dark:text-slate-200 border-amber-500/15",
       "Generation":
-        "bg-rose-500/5 text-rose-600 dark:text-rose-400/90 border-rose-400/15 dark:border-rose-500/20",
+        "bg-rose-500/8 text-slate-700 dark:text-slate-200 border-rose-500/15",
     };
 
     const taskColorClass =
       taskColors[dataset.taskName] ||
-      "bg-zinc-500/5 text-zinc-600 dark:text-zinc-400/90 border-zinc-400/15 dark:border-zinc-500/20";
+      "bg-slate-500/8 text-slate-700 dark:text-slate-200 border-slate-500/15";
 
     const deleteDatasetMutation = useMutation({
       mutationFn: async (datasetId: string) => {

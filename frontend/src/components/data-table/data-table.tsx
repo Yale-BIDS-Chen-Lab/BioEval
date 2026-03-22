@@ -34,6 +34,7 @@ interface DataTableProps<TData, TValue> {
 
   onSelectionChange?: (selected: TData[]) => void;
   children?: React.ReactNode;
+  compact?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -41,6 +42,7 @@ export function DataTable<TData, TValue>({
   data,
   onSelectionChange,
   children,
+  compact = false,
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
@@ -96,7 +98,11 @@ export function DataTable<TData, TValue>({
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id} colSpan={header.colSpan}>
+                    <TableHead
+                      key={header.id}
+                      colSpan={header.colSpan}
+                      className={compact ? "h-9 py-1.5" : undefined}
+                    >
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -117,7 +123,10 @@ export function DataTable<TData, TValue>({
                   data-state={row.getIsSelected() && "selected"}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      className={compact ? "py-1.5" : undefined}
+                    >
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext(),

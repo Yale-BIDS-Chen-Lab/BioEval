@@ -91,6 +91,7 @@ function InferenceList() {
         data={inferences}
         columns={columns}
         onSelectionChange={setSelectedRows}
+        compact
       >
         <Button
           className="h-10 cursor-pointer px-4 text-base font-semibold tracking-tight"

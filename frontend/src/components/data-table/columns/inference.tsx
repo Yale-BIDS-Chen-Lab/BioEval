@@ -9,6 +9,7 @@ import { useNavigate, useParams } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { InferenceEvaluationSummary } from "@/components/project/inference-evaluation-summary";
 
 function formatCreatedAt(value: string | null | undefined) {
   if (!value) return "-";
@@ -155,7 +156,12 @@ export const columns: ColumnDef<Inference>[] = [
       <DataTableColumnHeader column={column} title="Dataset" />
     ),
     cell: ({ row }) => {
-      return <div>{row.getValue("dataset")}</div>;
+      const dataset = row.getValue("dataset") as string;
+      return (
+        <div className="max-w-[180px] truncate" title={dataset}>
+          {dataset}
+        </div>
+      );
     },
     enableSorting: false,
     enableHiding: false,
@@ -167,9 +173,10 @@ export const columns: ColumnDef<Inference>[] = [
     ),
     cell: ({ row }) => {
       const provider = row.original.providerId;
+      const model = row.getValue("model") as string;
       return (
         <div className="flex space-x-2">
-          <div className="flex max-w-[500px] flex-row items-center gap-2 truncate font-medium">
+          <div className="flex max-w-[360px] flex-row items-center gap-2 truncate font-medium">
             <img
               src={`/logos/${provider}.svg`}
               alt="Provider logo"
@@ -177,7 +184,9 @@ export const columns: ColumnDef<Inference>[] = [
               height={24}
               className="select-none"
             />
-            <span>{row.getValue("model")}</span>
+            <span className="truncate" title={model}>
+              {model}
+            </span>
           </div>
         </div>
       );
@@ -240,6 +249,28 @@ export const columns: ColumnDef<Inference>[] = [
     filterFn: (row, id, value) => {
       return value.includes(row.getValue(id));
     },
+    enableHiding: false,
+  },
+  {
+    id: "evaluationSummary",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Evaluation Summary" />
+    ),
+    cell: ({ row }) => {
+      const { projectId } = useParams({
+        from: "/_authed/dashboard/project/$projectId/",
+      });
+
+      return (
+        <InferenceEvaluationSummary
+          inferenceId={row.original.inferenceId}
+          projectId={projectId}
+          taskName={row.original.task ?? ""}
+          summary={row.original.evaluationSummary}
+        />
+      );
+    },
+    enableSorting: false,
     enableHiding: false,
   },
   {

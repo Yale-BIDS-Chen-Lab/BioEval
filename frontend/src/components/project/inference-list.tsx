@@ -2,7 +2,7 @@ import { axios } from "@/lib/axios";
 import type { Inference } from "@/schemas/inference";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Columns2 } from "lucide-react";
 import { columns } from "../data-table/columns/inference";
 import { DataTable } from "../data-table/data-table";
@@ -16,8 +16,8 @@ function InferenceList() {
   const { projectId } = useParams({
     from: "/_authed/dashboard/project/$projectId/",
   });
-  const { isPending, isError, data, error, refetch } = useQuery({
-    queryKey: ["inferences"],
+  const { isPending, isError, data } = useQuery({
+    queryKey: ["inferences", projectId],
     queryFn: () => {
       return axios.get("api/inference/list", {
         withCredentials: true,
@@ -26,24 +26,22 @@ function InferenceList() {
         },
       });
     },
+    refetchInterval: (query) => {
+      const inferences = query.state.data?.data?.inferences as
+        | Inference[]
+        | undefined;
+      const hasRunningWork =
+        Array.isArray(inferences) &&
+        inferences.some(
+          (inference) =>
+            inference.status === "processing" ||
+            inference.status === "pending" ||
+            inference.evaluationSummary?.hasRunningEvaluations
+        );
+
+      return hasRunningWork ? 2000 : false;
+    },
   });
-
-  // Auto-refresh every 2 seconds if there are any processing inferences
-  useEffect(() => {
-    if (!data?.data?.inferences) return;
-
-    const hasProcessingInferences = data.data.inferences.some(
-      (inf: Inference) => inf.status === "processing" || inf.status === "pending"
-    );
-
-    if (hasProcessingInferences) {
-      const interval = setInterval(() => {
-        refetch();
-      }, 2000); // Poll every 2 seconds
-
-      return () => clearInterval(interval);
-    }
-  }, [data, refetch]);
 
   if (isPending || isError) {
     return <></>;

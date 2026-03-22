@@ -36,6 +36,24 @@ export const inferenceSchema = z.object({
   status: z.enum(["pending", "processing", "done", "failed", "canceled"]),
   isFavorite: z.boolean().optional(),
   createdAt: z.string().nullable().optional(),
+  task: z.string().optional(),
+  dataset: z.string().optional(),
+  totalExamples: z.number().nullable().optional(),
+  processedExamples: z.number().nullable().optional(),
+  evaluationSummary: z
+    .object({
+      count: z.number(),
+      hasRunningEvaluations: z.boolean(),
+      latestCompleted: z
+        .object({
+          evaluationId: z.string().nonempty(),
+          createdAt: z.string().nullable(),
+          metrics: z.array(z.string()),
+          aggregate: z.record(z.string(), z.number()),
+        })
+        .nullable(),
+    })
+    .optional(),
 });
 
 export type Inference = z.infer<typeof inferenceSchema>;

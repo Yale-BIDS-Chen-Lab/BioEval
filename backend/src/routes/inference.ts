@@ -65,6 +65,13 @@ type DatasetPlacementSummary = {
   value: number;
 } | null;
 
+type OverallModelRankingSummary = {
+  position: number;
+  averageRank: number;
+  datasetCount: number;
+  modelCount: number;
+} | null;
+
 function getAzureReasoningEffortOptions(modelName: string) {
   if (modelName === "gpt-5") {
     return ["minimal", "low", "medium", "high"];
@@ -170,6 +177,34 @@ function getAggregateMetricValue(
 
   const [, value] = matchedEntry;
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function assignAverageRanks<T extends { value: number }>(items: T[]) {
+  const sorted = [...items].sort((a, b) => b.value - a.value);
+  const ranked: Array<T & { rank: number }> = [];
+
+  let index = 0;
+  while (index < sorted.length) {
+    let end = index + 1;
+    while (end < sorted.length && sorted[end].value === sorted[index].value) {
+      end += 1;
+    }
+
+    const startRank = index + 1;
+    const endRank = end;
+    const averageRank = (startRank + endRank) / 2;
+
+    for (let cursor = index; cursor < end; cursor += 1) {
+      ranked.push({
+        ...sorted[cursor],
+        rank: averageRank,
+      });
+    }
+
+    index = end;
+  }
+
+  return ranked;
 }
 
 async function readEvaluationAggregate(
@@ -410,6 +445,10 @@ router.get(
         string,
         NonNullable<DatasetPlacementSummary>
       >();
+      const overallRankingByModel = new Map<
+        string,
+        NonNullable<OverallModelRankingSummary>
+      >();
 
       const inferencesByDataset = new Map<
         string,
@@ -458,11 +497,125 @@ router.get(
         });
       }
 
+      const modelScoresByDataset = new Map<
+        string,
+        {
+          providerId: string;
+          model: string;
+          datasets: Map<
+            string,
+            {
+              value: number;
+            }
+          >;
+        }
+      >();
+
+      const datasetUniverse = new Set<string>();
+
+      for (const inference of inferencesWithSummary) {
+        const primaryMetricBest = inference.evaluationSummary?.primaryMetricBest;
+        if (!primaryMetricBest) {
+          continue;
+        }
+
+        datasetUniverse.add(inference.datasetId);
+        const modelKey = `${inference.providerId}::${inference.model}`;
+        const current =
+          modelScoresByDataset.get(modelKey) ??
+          {
+            providerId: inference.providerId,
+            model: inference.model,
+            datasets: new Map<string, { value: number }>(),
+          };
+
+        const existingDatasetScore = current.datasets.get(inference.datasetId);
+        if (
+          !existingDatasetScore ||
+          primaryMetricBest.value > existingDatasetScore.value
+        ) {
+          current.datasets.set(inference.datasetId, {
+            value: primaryMetricBest.value,
+          });
+        }
+
+        modelScoresByDataset.set(modelKey, current);
+      }
+
+      const requiredDatasetIds = [...datasetUniverse];
+      const comparableModels = [...modelScoresByDataset.entries()]
+        .filter(([, modelEntry]) =>
+          requiredDatasetIds.every((datasetId) =>
+            modelEntry.datasets.has(datasetId)
+          )
+        )
+        .map(([modelKey, modelEntry]) => ({
+          modelKey,
+          ...modelEntry,
+        }));
+
+      if (requiredDatasetIds.length > 0 && comparableModels.length >= 2) {
+        const cumulativeRanks = new Map<string, number>();
+
+        for (const datasetId of requiredDatasetIds) {
+          const datasetRanks = assignAverageRanks(
+            comparableModels.map((modelEntry) => ({
+              modelKey: modelEntry.modelKey,
+              value: modelEntry.datasets.get(datasetId)!.value,
+            }))
+          );
+
+          for (const datasetRank of datasetRanks) {
+            cumulativeRanks.set(
+              datasetRank.modelKey,
+              (cumulativeRanks.get(datasetRank.modelKey) ?? 0) + datasetRank.rank
+            );
+          }
+        }
+
+        const averagedModelRanks = comparableModels
+          .map((modelEntry) => ({
+            modelKey: modelEntry.modelKey,
+            averageRank:
+              (cumulativeRanks.get(modelEntry.modelKey) ?? 0) /
+              requiredDatasetIds.length,
+          }))
+          .sort((a, b) => {
+            if (a.averageRank !== b.averageRank) {
+              return a.averageRank - b.averageRank;
+            }
+            return a.modelKey.localeCompare(b.modelKey);
+          });
+
+        let currentPosition = 0;
+        let previousAverageRank: number | null = null;
+        averagedModelRanks.forEach((entry, index) => {
+          if (
+            previousAverageRank === null ||
+            entry.averageRank !== previousAverageRank
+          ) {
+            currentPosition = index + 1;
+            previousAverageRank = entry.averageRank;
+          }
+
+          overallRankingByModel.set(entry.modelKey, {
+            position: currentPosition,
+            averageRank: entry.averageRank,
+            datasetCount: requiredDatasetIds.length,
+            modelCount: comparableModels.length,
+          });
+        });
+      }
+
       const inferences = inferencesWithSummary.map((inference) => ({
         ...inference,
         datasetPlacement:
           placementsByInference.get(inference.inferenceId) ??
           (null as DatasetPlacementSummary),
+        overallModelRanking:
+          overallRankingByModel.get(
+            `${inference.providerId}::${inference.model}`
+          ) ?? (null as OverallModelRankingSummary),
       }));
 
       res.json({ success: true, inferences });

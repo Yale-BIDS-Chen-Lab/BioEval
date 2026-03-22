@@ -49,6 +49,15 @@ export const inferenceSchema = z.object({
     })
     .nullable()
     .optional(),
+  overallModelRanking: z
+    .object({
+      position: z.number().int().positive(),
+      averageRank: z.number(),
+      datasetCount: z.number().int().positive(),
+      modelCount: z.number().int().positive(),
+    })
+    .nullable()
+    .optional(),
   evaluationSummary: z
     .object({
       count: z.number(),

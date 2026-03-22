@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Columns2 } from "lucide-react";
 import { columns } from "../data-table/columns/inference";
 import { DataTable } from "../data-table/data-table";
+import { OverallModelRanking } from "./overall-model-ranking";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
 
@@ -84,7 +85,8 @@ function InferenceList() {
   const canCompare = selectedCount >= 2;
 
   return (
-    <>
+    <div className="space-y-6">
+      <OverallModelRanking inferences={inferences} />
       <DataTable
         data={inferences}
         columns={columns}
@@ -127,7 +129,7 @@ function InferenceList() {
         </Button>
         {/* TODO: add model filter input */}
       </DataTable>
-    </>
+    </div>
   );
 }
 

@@ -9,6 +9,7 @@ import {
 import {
   getCompletedInferences,
   inferenceExists,
+  getInferenceObject,
 } from "../db/queries/inference";
 import { getMetrics, metricExists } from "../db/queries/metric";
 import { projectExists } from "../db/queries/project";
@@ -20,6 +21,7 @@ import {
   createEvaluationSchema,
   dataviewSchema,
   deleteEvaluationSchema,
+  editHumanScoreSchema,
   getEvaluationOptionsSchema,
   getEvaluationsSchema,
 } from "../schemas/evaluation";
@@ -32,8 +34,40 @@ import {
 } from "../db/queries/parsing";
 import Ajv from "ajv/dist/2020";
 import { getNotes } from "../db/queries/note";
+import {
+  deleteHumanScores,
+  getEffectiveEvaluationStatus,
+  getHumanScoreAggregate,
+  getHumanScores,
+  upsertHumanScore,
+} from "../db/queries/human-score";
 
 const router = express.Router();
+
+async function getEvaluationRowIds(evaluationObjectKey: string) {
+  const s3conn = await new S3Connection().connect();
+
+  try {
+    await s3conn.createTable(
+      "evaluation",
+      evaluationObjectKey,
+      "evaluation_rows_source"
+    );
+    const rows = await s3conn.con.runAndReadAll(`
+      SELECT unnest(evaluation_rows_source.rows).id AS id
+      FROM evaluation_rows_source
+    `);
+
+    return new Set(
+      rows
+        .getRowObjectsJS()
+        .map((row) => row.id)
+        .filter((id): id is string => typeof id === "string")
+    );
+  } finally {
+    await s3conn.dispose();
+  }
+}
 
 router.post(
   "/create",
@@ -149,7 +183,35 @@ router.get(
         req.query.inferenceId,
         req.user.id
       );
-      res.json({ success: true, evaluations: inferenceEvaluations });
+      const inferenceMeta = await getInferenceObject(
+        req.query.inferenceId,
+        req.user.id
+      );
+      const totalExamples =
+        inferenceMeta?.totalExamples ?? inferenceMeta?.processedExamples ?? 0;
+
+      const evaluations = await Promise.all(
+        inferenceEvaluations.map(async (evaluation) => {
+          const effective = await getEffectiveEvaluationStatus({
+            evaluationId: evaluation.evaluationId,
+            metrics: evaluation.metrics,
+            status: evaluation.status as
+              | "pending"
+              | "processing"
+              | "done"
+              | "failed"
+              | "canceled",
+            totalExamples,
+          });
+
+          return {
+            ...evaluation,
+            status: effective.status,
+          };
+        })
+      );
+
+      res.json({ success: true, evaluations });
     },
     "query"
   )
@@ -249,12 +311,39 @@ router.get(
       `);
 
       const aggregateRow = aggregateResult.getRowObjectsJS()[0];
-      const aggregate = aggregateRow?.aggregate
-        ? (aggregateRow.aggregate as { key: string; value: any; }[]).reduce(
-            (acc, { key, value }) => ((acc[key] = value), acc),
-            {}
-          )
+      const aggregate: Record<string, unknown> = aggregateRow?.aggregate
+        ? (aggregateRow.aggregate as { key: string; value: any }[]).reduce<
+            Record<string, unknown>
+          >((acc, { key, value }) => {
+            acc[key] = value;
+            return acc;
+          }, {})
         : {};
+
+      const humanScores = await getHumanScores(req.query.evaluationId);
+      const hasHumanEvaluation = Array.isArray(evaluation.metrics)
+        ? evaluation.metrics.includes("human_evaluation")
+        : false;
+
+      if (hasHumanEvaluation) {
+        const humanAggregate = await getHumanScoreAggregate(req.query.evaluationId);
+        if (humanAggregate.human_evaluation_mean !== null) {
+          aggregate.human_evaluation_mean = humanAggregate.human_evaluation_mean;
+        }
+        aggregate.human_evaluation_count = humanAggregate.human_evaluation_count;
+      }
+
+      const effectiveStatus = await getEffectiveEvaluationStatus({
+        evaluationId: req.query.evaluationId,
+        metrics: evaluation.metrics,
+        status: evaluation.status as
+          | "pending"
+          | "processing"
+          | "done"
+          | "failed"
+          | "canceled",
+        totalExamples: evaluation.totalExamples ?? evaluation.processedExamples ?? 0,
+      });
 
       const notesByRowId = await getNotes(evaluation.inferenceId);
       // DuckDB disambiguates duplicate column names (e.g. id from dataset, inference, unnested) as id, id:1, id:2. Drop the duplicates.
@@ -268,6 +357,7 @@ router.get(
           record.input as string
         );
         out.notes = notesByRowId[(record.id as string) ?? ""] ?? "";
+        out.humanScore = humanScores[(record.id as string) ?? ""] ?? null;
         return out;
       });
 
@@ -276,18 +366,91 @@ router.get(
       const meta = {
         model: evaluation.modelName,
         provider: { id: evaluation.providerId, name: evaluation.providerName },
-        status: evaluation.status,
+        status: effectiveStatus.status,
         dataset: { id: evaluation.datasetId, name: evaluation.datasetName },
         task: { id: evaluation.taskId, name: evaluation.taskName },
         prompt: evaluation.prompt,
+        evaluationMetrics: evaluation.metrics,
         parameters: evaluation.parameters,
         totalExamples: evaluation.totalExamples,
         processedExamples: evaluation.processedExamples,
+        humanEvaluationProgress:
+          hasHumanEvaluation
+            ? {
+                ratedRows: effectiveStatus.ratedRows,
+                totalRows: effectiveStatus.totalRows,
+              }
+            : null,
       };
 
       return res.json({ success: true, records, aggregate, meta });
     },
     "query"
+  )
+);
+
+router.post(
+  "/edit-human-score",
+  ...validatedRoute(
+    editHumanScoreSchema,
+    async (req, res) => {
+      const evaluation = await getEvaluationObject(
+        req.body.evaluationId,
+        req.user.id
+      );
+
+      if (!evaluation) {
+        return res
+          .status(StatusCodes.NOT_FOUND)
+          .json({ success: false, error: "Evaluation doesn't exist" });
+      }
+
+      const evaluationMetrics = Array.isArray(evaluation.metrics)
+        ? evaluation.metrics
+        : [];
+      if (!evaluationMetrics.includes("human_evaluation")) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          error: "This evaluation does not support human scoring",
+        });
+      }
+
+      if (evaluation.status !== "done") {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          error: "Human scoring is only available after evaluation completes",
+        });
+      }
+
+      if (!evaluation.evaluationObjectKey) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          error: "Evaluation rows are not available for scoring",
+        });
+      }
+
+      const validRowIds = await getEvaluationRowIds(evaluation.evaluationObjectKey);
+      const invalidRow = req.body.scores.find(
+        (score) => !validRowIds.has(score.rowId)
+      );
+      if (invalidRow) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          error: `Invalid evaluation row: ${invalidRow.rowId}`,
+        });
+      }
+
+      for (const score of req.body.scores) {
+        if (score.score === null) {
+          await deleteHumanScores(req.body.evaluationId, [score.rowId]);
+        } else {
+          await upsertHumanScore(req.body.evaluationId, score.rowId, score.score);
+        }
+      }
+
+      return res.json({ success: true });
+    },
+    "body"
   )
 );
 

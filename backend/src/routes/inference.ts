@@ -37,6 +37,10 @@ import { AuthedRequest } from "../types/auth";
 import { randomId } from "../utils/misc";
 import { getUserConfig } from "../db/queries/integration";
 import { getNotes, upsertNote } from "../db/queries/note";
+import {
+  getEffectiveEvaluationStatus,
+  getHumanScoreAggregate,
+} from "../db/queries/human-score";
 import { z } from "zod/v4";
 import {
   deleteHighlights,
@@ -230,11 +234,58 @@ async function readEvaluationAggregate(
   }
 }
 
+async function getEvaluationAggregateWithHumanScore(
+  evaluation: Pick<InferenceEvaluationRow, "evaluationId" | "metrics" | "objectKey">
+): Promise<AggregateMetrics> {
+  let aggregate: AggregateMetrics = {};
+
+  if (evaluation.objectKey) {
+    aggregate = await readEvaluationAggregate(evaluation.objectKey);
+  }
+
+  const metricList = normalizeMetricList(evaluation.metrics);
+  if (!metricList.includes("human_evaluation")) {
+    return aggregate;
+  }
+
+  const humanAggregate = await getHumanScoreAggregate(evaluation.evaluationId);
+  if (humanAggregate.human_evaluation_mean !== null) {
+    aggregate.human_evaluation_mean = humanAggregate.human_evaluation_mean;
+  }
+  aggregate.human_evaluation_count = humanAggregate.human_evaluation_count;
+
+  return aggregate;
+}
+
 async function buildInferenceEvaluationSummary(
   evaluations: InferenceEvaluationRow[],
-  taskName: string
+  taskName: string,
+  totalExamples: number
 ) {
-  const orderedEvaluations = sortEvaluationsByCreatedAtDesc(evaluations);
+  const evaluationsWithEffectiveStatus = await Promise.all(
+    evaluations.map(async (evaluation) => {
+      const effective = await getEffectiveEvaluationStatus({
+        evaluationId: evaluation.evaluationId,
+        metrics: evaluation.metrics,
+        status: evaluation.status as
+          | "pending"
+          | "processing"
+          | "done"
+          | "failed"
+          | "canceled",
+        totalExamples,
+      });
+
+      return {
+        ...evaluation,
+        status: effective.status,
+      };
+    })
+  );
+
+  const orderedEvaluations = sortEvaluationsByCreatedAtDesc(
+    evaluationsWithEffectiveStatus
+  );
   const latestCompleted = orderedEvaluations.find(
     (evaluation) => evaluation.status === "done" && evaluation.objectKey
   );
@@ -255,7 +306,11 @@ async function buildInferenceEvaluationSummary(
   for (const evaluation of completedEvaluations) {
     let aggregate: AggregateMetrics = {};
     try {
-      aggregate = await readEvaluationAggregate(evaluation.objectKey!);
+      aggregate = await getEvaluationAggregateWithHumanScore({
+        evaluationId: evaluation.evaluationId,
+        metrics: evaluation.metrics,
+        objectKey: evaluation.objectKey!,
+      });
     } catch (error) {
       console.error(
         `Failed to read aggregate for evaluation ${evaluation.evaluationId}:`,
@@ -435,7 +490,8 @@ router.get(
             ...projectInference,
             evaluationSummary: await buildInferenceEvaluationSummary(
               evaluations,
-              projectInference.task ?? ""
+              projectInference.task ?? "",
+              projectInference.totalExamples ?? projectInference.processedExamples ?? 0
             ),
           };
         })
@@ -657,13 +713,34 @@ router.get(
       const evaluations = sortEvaluationsByCreatedAtDesc(
         await getInferenceEvaluations(req.query.inferenceId, req.user.id)
       );
+      const inferenceMeta = await getInferenceObject(
+        req.query.inferenceId,
+        req.user.id
+      );
+      const totalExamples =
+        inferenceMeta?.totalExamples ?? inferenceMeta?.processedExamples ?? 0;
 
       const detailedEvaluations = await Promise.all(
         evaluations.map(async (evaluation) => {
+          const effective = await getEffectiveEvaluationStatus({
+            evaluationId: evaluation.evaluationId,
+            metrics: evaluation.metrics,
+            status: evaluation.status as
+              | "pending"
+              | "processing"
+              | "done"
+              | "failed"
+              | "canceled",
+            totalExamples,
+          });
           let aggregate: AggregateMetrics | null = null;
           if (evaluation.status === "done" && evaluation.objectKey) {
             try {
-              aggregate = await readEvaluationAggregate(evaluation.objectKey);
+              aggregate = await getEvaluationAggregateWithHumanScore({
+                evaluationId: evaluation.evaluationId,
+                metrics: evaluation.metrics,
+                objectKey: evaluation.objectKey,
+              });
             } catch (error) {
               console.error(
                 `Failed to read aggregate for evaluation ${evaluation.evaluationId}:`,
@@ -675,7 +752,7 @@ router.get(
 
           return {
             evaluationId: evaluation.evaluationId,
-            status: evaluation.status,
+            status: effective.status,
             metrics: normalizeMetricList(evaluation.metrics),
             createdAt: evaluation.createdAt ?? null,
             aggregate,

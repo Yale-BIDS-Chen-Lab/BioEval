@@ -4,6 +4,7 @@ import storage.object
 from db.queries import inference, config
 from inference.huggingface import HuggingfaceClient, InferenceCanceledError
 from inference.azure import AzureClient
+from inference.anthropic import AnthropicClient
 from storage import duckdb, minio
 
 
@@ -134,6 +135,12 @@ def handle_inference_message(inference_id: str) -> None:
         )
       case "azure":
         client = AzureClient(
+          config_record["settings"],
+          inference_record["model"],
+          inference_record["parameters"],
+        )
+      case "anthropic":
+        client = AnthropicClient(
           config_record["settings"],
           inference_record["model"],
           inference_record["parameters"],

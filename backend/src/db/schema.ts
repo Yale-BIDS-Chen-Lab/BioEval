@@ -361,6 +361,27 @@ export const highlight = pgTable(
   ]
 );
 
+export const humanScore = pgTable(
+  "human_score",
+  {
+    id: serial().primaryKey(),
+    evaluationId: text().notNull(),
+    rowId: text().notNull(),
+    score: integer().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.evaluationId],
+      foreignColumns: [evaluation.evaluationId],
+      name: "human_score_evaluation_fkey",
+    }),
+    uniqueIndex("human_score_evaluation_row_unique").on(
+      table.evaluationId,
+      table.rowId
+    ),
+  ]
+);
+
 export type NewProject = typeof project.$inferInsert;
 export type NewInference = typeof inference.$inferInsert & {
   status: Status;

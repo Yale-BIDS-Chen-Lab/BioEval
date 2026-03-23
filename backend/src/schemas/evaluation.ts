@@ -22,6 +22,18 @@ export const dataviewSchema = z.object({
   evaluationId: z.string().nonempty(),
 });
 
+export const editHumanScoreSchema = z.object({
+  evaluationId: z.string().nonempty(),
+  scores: z
+    .array(
+      z.object({
+        rowId: z.string().nonempty(),
+        score: z.number().int().min(1).max(5).nullable(),
+      })
+    )
+    .min(1),
+});
+
 export const deleteEvaluationSchema = z.object({
   evaluationId: z.string().nonempty(),
 });

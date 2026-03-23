@@ -1,6 +1,10 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "..";
 import { dataset, evaluation, inference, NewEvaluation, provider, task } from "../schema";
+import {
+  deleteHumanScoresByEvaluation,
+  deleteHumanScoresByInference,
+} from "./human-score";
 
 let evaluationHasCreatedAtColumn: boolean | null = null;
 
@@ -138,6 +142,7 @@ export async function deleteEvaluationsByInference(
   inferenceId: string,
   userId: string
 ) {
+  await deleteHumanScoresByInference(inferenceId);
   return db
     .delete(evaluation)
     .where(
@@ -149,6 +154,7 @@ export async function deleteEvaluation(
   evaluationId: string,
   userId: string
 ) {
+  await deleteHumanScoresByEvaluation(evaluationId);
   return db
     .delete(evaluation)
     .where(

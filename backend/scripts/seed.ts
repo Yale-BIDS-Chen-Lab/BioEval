@@ -230,6 +230,10 @@ const metrics = {
     name: "LLM Judge: Relevance",
     allowedTasks: ["mcq", "ner", "re", "mlc", "generation"],
   },
+  human_evaluation: {
+    name: "Human Evaluation",
+    allowedTasks: ["mcq", "ner", "re", "mlc", "generation"],
+  },
 };
 
 // TODO: separate parsing function definitions into individual config files

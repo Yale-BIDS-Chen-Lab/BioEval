@@ -43,6 +43,7 @@ class EvaluationClient:
         | "exact_match_precision"
         | "exact_match_recall"
         | "exact_match_f1"
+        | "human_evaluation"
       ):
         return None
       case "accuracy":
@@ -88,6 +89,7 @@ class EvaluationClient:
         | "llm_judge_correctness"
         | "llm_judge_completeness"
         | "llm_judge_relevance"
+        | "human_evaluation"
       ):
         return None
       case "macro_f1":

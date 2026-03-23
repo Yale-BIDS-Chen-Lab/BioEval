@@ -123,4 +123,5 @@ If you need help extending BioEval with new models, metrics, or benchmark workfl
 
 ## License
 
-This project is licensed under **CC BY-NC-ND 4.0**.
+This project is licensed under **PolyForm Noncommercial 1.0.0**.
+See [LICENSE](/Users/xai/Desktop/BioEval/LICENSE) or <https://polyformproject.org/licenses/noncommercial/1.0.0/>.

@@ -1,5 +1,6 @@
 import { db } from "../src/db";
 import { integration } from "../src/db/schema";
+import { eq } from "drizzle-orm";
 import { z } from "zod/v4";
 
 const integrations = [
@@ -17,6 +18,12 @@ const integrations = [
       apiKey: z.string().nonempty(),
     }),
   },
+  {
+    provider: "anthropic",
+    schema: z.object({
+      apiKey: z.string().nonempty(),
+    }),
+  },
 ];
 
 async function seedIntegrations() {
@@ -24,18 +31,24 @@ async function seedIntegrations() {
   
   for (const integrationData of integrations) {
     try {
+      const existing = await db
+        .select({ id: integration.id })
+        .from(integration)
+        .where(eq(integration.providerId, integrationData.provider))
+        .limit(1);
+
+      if (existing.length > 0) {
+        console.log(`- Integration for ${integrationData.provider} already exists`);
+        continue;
+      }
+
       await db.insert(integration).values({
         providerId: integrationData.provider,
         schema: z.toJSONSchema(integrationData.schema),
       });
       console.log(`✓ Inserted integration for ${integrationData.provider}`);
     } catch (error: any) {
-      if (error.code === "23505") {
-        // Unique constraint violation - already exists
-        console.log(`- Integration for ${integrationData.provider} already exists`);
-      } else {
-        console.error(`✗ Error inserting ${integrationData.provider}:`, error.message);
-      }
+      console.error(`✗ Error inserting ${integrationData.provider}:`, error.message);
     }
   }
   
@@ -44,4 +57,3 @@ async function seedIntegrations() {
 }
 
 seedIntegrations();
-

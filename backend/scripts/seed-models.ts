@@ -17,6 +17,12 @@ const azureModels = [
   "o4-mini",
 ];
 
+const anthropicModels = [
+  "claude-haiku-4-5",
+  "claude-sonnet-4-6",
+  "claude-opus-4-6",
+];
+
 async function seedModels() {
   console.log("Seeding model catalog...");
 
@@ -38,6 +44,18 @@ async function seedModels() {
       .values({
         name: modelName,
         providerId: "azure",
+      })
+      .onConflictDoNothing();
+
+    console.log(`- ensured model exists: ${modelName}`);
+  }
+
+  for (const modelName of anthropicModels) {
+    await db
+      .insert(modelTable)
+      .values({
+        name: modelName,
+        providerId: "anthropic",
       })
       .onConflictDoNothing();
 

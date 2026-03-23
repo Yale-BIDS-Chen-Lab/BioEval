@@ -750,6 +750,31 @@ const providers = [
     },
     models: ["gpt-4o", "gpt-5", "gpt-5.4", "o1", "o3", "o3-mini", "o4-mini"],
   },
+  {
+    provider: {
+      name: "Anthropic",
+      providerId: "anthropic",
+      parameters: [
+        {
+          id: "max_tokens",
+          name: "Max tokens",
+          description:
+            "Maximum number of tokens returned in the response.",
+          schema: z.toJSONSchema(numeric(1)),
+          defaultValue: 4096,
+        },
+        {
+          id: "temperature",
+          name: "Temperature",
+          description:
+            "Controls randomness; higher values = more diverse, lower = more deterministic.",
+          schema: z.toJSONSchema(numeric(0, 1)),
+          defaultValue: 0,
+        },
+      ],
+    },
+    models: ["claude-haiku-4-5", "claude-sonnet-4-6", "claude-opus-4-6"],
+  },
 ];
 
 const integrations = [
@@ -764,6 +789,12 @@ const integrations = [
     schema: z.object({
       endpoint: z.string().nonempty(),
       version: z.string().nonempty(),
+      apiKey: z.string().nonempty(),
+    }),
+  },
+  {
+    provider: "anthropic",
+    schema: z.object({
       apiKey: z.string().nonempty(),
     }),
   },

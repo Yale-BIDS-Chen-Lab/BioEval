@@ -81,6 +81,9 @@ function formatMetricName(metric: string) {
     llm_judge_correctness: "LLM Judge Correctness",
     llm_judge_completeness: "LLM Judge Completeness",
     llm_judge_relevance: "LLM Judge Relevance",
+    human_evaluation: "Human Evaluation",
+    human_evaluation_mean: "Human Score (Avg)",
+    human_evaluation_count: "Rated Rows",
   };
 
   return names[normalized] ?? metric;

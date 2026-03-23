@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 
 import { axios } from "@/lib/axios";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useEffect, useMemo, useRef, useState } from "react";
 import TextareaAutosize from "react-textarea-autosize";
@@ -20,6 +20,11 @@ import { Cell, DataTable } from "../dataview-table/table";
 type EditNotePayload = {
   inferenceId: string;
   notes: { rowId: string; content: string }[];
+};
+
+type EditHumanScorePayload = {
+  evaluationId: string;
+  scores: { rowId: string; score: number | null }[];
 };
 
 export function NotesCell({
@@ -53,8 +58,10 @@ export function NotesCell({
         notes: [{ rowId, content: value }],
       });
     }, 500);
-    return () => timer.current && clearTimeout(timer.current);
-  }, [value, rowId, saveNotes]);
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, [value, rowId, saveNotes, inferenceId]);
 
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
@@ -83,6 +90,92 @@ export function NotesCell({
         className="w-full resize-none border-0 bg-transparent p-0 font-mono text-xs leading-5 shadow-none outline-none focus-visible:ring-0"
       />
 
+      {isPending && (
+        <Loader2 className="absolute top-1/2 right-1 h-3.5 w-3.5 -translate-y-1/2 animate-spin" />
+      )}
+      {!isPending && isSuccess && (
+        <Check className="absolute top-1/2 right-1 h-3.5 w-3.5 -translate-y-1/2 text-green-500" />
+      )}
+    </div>
+  );
+}
+
+export function HumanScoreCell({
+  row,
+  evaluationId,
+}: {
+  row: any;
+  evaluationId: string;
+}) {
+  const expanded = row.getIsSelected();
+  const rowId = row.original.id;
+  const initialValue =
+    typeof row.original.humanScore === "number"
+      ? String(row.original.humanScore)
+      : "unrated";
+  const [value, setValue] = useState(initialValue);
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    setValue(
+      typeof row.original.humanScore === "number"
+        ? String(row.original.humanScore)
+        : "unrated"
+    );
+  }, [row.original.humanScore]);
+
+  const { mutate, isPending, isSuccess } = useMutation({
+    mutationFn: (payload: EditHumanScorePayload) =>
+      axios.post("api/evaluation/edit-human-score", payload, {
+        withCredentials: true,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["evaluation-dataview", evaluationId],
+      });
+    },
+  });
+
+  const save = (nextValue: string) => {
+    setValue(nextValue);
+    mutate({
+      evaluationId,
+      scores: [
+        {
+          rowId,
+          score: nextValue === "unrated" ? null : Number(nextValue),
+        },
+      ],
+    });
+  };
+
+  if (!expanded) {
+    return (
+      <div className="w-24 font-mono text-xs">
+        {value === "unrated" ? "—" : value}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="relative w-28"
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <Select value={value} onValueChange={save} disabled={isPending}>
+        <SelectTrigger className="h-8 w-24 font-mono text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="unrated">—</SelectItem>
+          {[1, 2, 3, 4, 5].map((score) => (
+            <SelectItem key={score} value={String(score)}>
+              {score}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       {isPending && (
         <Loader2 className="absolute top-1/2 right-1 h-3.5 w-3.5 -translate-y-1/2 animate-spin" />
       )}
@@ -272,11 +365,15 @@ type FilterCondition = {
 export function DataView({
   data,
   inferenceId,
+  evaluationId,
   taskId,
+  evaluationMetrics = [],
 }: {
   data: any[];
   inferenceId: string;
+  evaluationId: string;
   taskId?: string;
+  evaluationMetrics?: string[];
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterConditions, setFilterConditions] = useState<FilterCondition[]>([]);
@@ -350,7 +447,7 @@ export function DataView({
 
   const metricColumns = useMemo<ColumnDef<any>[]>(
     () =>
-      metricKeys.map((key) => ({
+      metricKeys.map((key: string) => ({
         id: key,
         meta: { label: key },
         header: () => (
@@ -358,9 +455,9 @@ export function DataView({
             {key}
           </div>
         ),
-        accessorFn: (row) =>
+        accessorFn: (row: any) =>
           row.metrics.find((m: any) => m.key === key)?.value ?? "",
-        cell: ({ getValue }) => {
+        cell: ({ getValue }: { getValue: () => unknown }) => {
           const v = getValue();
           return (
             <div className="text-foreground w-32 font-mono text-xs">
@@ -456,11 +553,13 @@ export function DataView({
               Reference Vector
             </div>
           ),
-          cell: ({ row }) => {
+          cell: ({ row }: { row: any }) => {
             const vector = row.getValue("referenceVector");
             if (!vector) return <Cell value="" expanded={row.getIsSelected()} />;
             // Convert to array of numbers and format without quotes
-            const numArray = Array.isArray(vector) ? vector.map(v => Number(v)) : [];
+            const numArray = Array.isArray(vector)
+              ? vector.map((value: unknown) => Number(value))
+              : [];
             const formatted = `[${numArray.join(",")}]`;
             return (
               <Cell 
@@ -478,11 +577,13 @@ export function DataView({
               Parsed Output Vector
             </div>
           ),
-          cell: ({ row }) => {
+          cell: ({ row }: { row: any }) => {
             const vector = row.getValue("parsedVector");
             if (!vector) return <Cell value="" expanded={row.getIsSelected()} />;
             // Convert to array of numbers and format without quotes
-            const numArray = Array.isArray(vector) ? vector.map(v => Number(v)) : [];
+            const numArray = Array.isArray(vector)
+              ? vector.map((value: unknown) => Number(value))
+              : [];
             const formatted = `[${numArray.join(",")}]`;
             return (
               <Cell 
@@ -494,6 +595,22 @@ export function DataView({
         },
       ] : []),
       ...metricColumns,
+      ...(evaluationMetrics.includes("human_evaluation")
+        ? [
+            {
+              id: "humanScore",
+              meta: { label: "Human Evaluation" },
+              header: () => (
+                <div className="text-foreground w-28 text-left font-mono text-xs font-bold">
+                  Human Evaluation
+                </div>
+              ),
+              cell: ({ row }: { row: any }) => (
+                <HumanScoreCell row={row} evaluationId={evaluationId} />
+              ),
+            } satisfies ColumnDef<any>,
+          ]
+        : []),
       {
         id: "notes",
         meta: { label: "Comments" },
@@ -505,7 +622,7 @@ export function DataView({
         cell: ({ row }) => <NotesCell row={row} inferenceId={inferenceId} />,
       },
     ],
-    [metricColumns, inferenceId, highlights, taskId],
+    [metricColumns, inferenceId, highlights, taskId, evaluationMetrics, evaluationId],
   );
 
   return (
@@ -569,9 +686,9 @@ export function DataView({
                       <SelectValue placeholder="Metric" />
                     </SelectTrigger>
                     <SelectContent>
-                      {metricKeys.map((m) => (
-                        <SelectItem key={m} value={m}>
-                          {m}
+                      {metricKeys.map((metricKey: string) => (
+                        <SelectItem key={metricKey} value={metricKey}>
+                          {metricKey}
                         </SelectItem>
                       ))}
                     </SelectContent>

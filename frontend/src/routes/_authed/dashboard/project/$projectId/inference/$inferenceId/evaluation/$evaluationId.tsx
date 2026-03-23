@@ -170,7 +170,9 @@ function RouteComponent() {
         <DataView 
           data={data?.records ?? []} 
           inferenceId={inferenceId}
+          evaluationId={evaluationId}
           taskId={data?.meta?.task?.id}
+          evaluationMetrics={data?.meta?.evaluationMetrics ?? []}
         />
       </div>
     </div>

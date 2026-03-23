@@ -1,9 +1,26 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { FormField, FormItem } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useMemo } from "react";
 import { ConfigureLLMJudge, getDefaultConfig } from "./configure-llm-judge";
 
 function SelectMetrics({ metrics, form, llmJudgeConfig }: { metrics: any[]; form: any; llmJudgeConfig?: any }) {
+  const orderedMetrics = useMemo(() => {
+    const regular = metrics.filter(
+      (metric) =>
+        !metric.metricId.startsWith("llm_judge_") &&
+        metric.metricId !== "human_evaluation"
+    );
+    const llmJudge = metrics.filter((metric) =>
+      metric.metricId.startsWith("llm_judge_")
+    );
+    const human = metrics.filter(
+      (metric) => metric.metricId === "human_evaluation"
+    );
+
+    return [...regular, ...llmJudge, ...human];
+  }, [metrics]);
+
   return (
     <FormField
       control={form.control}
@@ -19,7 +36,7 @@ function SelectMetrics({ metrics, form, llmJudgeConfig }: { metrics: any[]; form
 
           <ScrollArea className="h-[250px] overflow-y-hidden rounded-sm border p-2">
             <div className="flex h-full flex-col gap-4">
-              {metrics.map((metric) => {
+              {orderedMetrics.map((metric) => {
                 const isChecked = field.value?.includes(metric.metricId);
                 const isLlmJudge = metric.metricId.startsWith("llm_judge_");
                 return (

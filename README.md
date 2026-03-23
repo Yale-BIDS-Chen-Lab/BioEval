@@ -119,9 +119,7 @@ docker compose down -v
 If you run into any issues, please open a GitHub issue and include your environment and logs when possible.
 If you need help extending BioEval with new models, metrics, or benchmark workflows, please email xuguang.ai@outlook.com.
 
----
-
 ## License
 
 This project is licensed under **PolyForm Noncommercial 1.0.0**.
-See [LICENSE](/Users/xai/Desktop/BioEval/LICENSE) or <https://polyformproject.org/licenses/noncommercial/1.0.0/>.
+See [LICENSE.md](/Users/xai/Desktop/BioEval/LICENSE.md) or <https://polyformproject.org/licenses/noncommercial/1.0.0/>.

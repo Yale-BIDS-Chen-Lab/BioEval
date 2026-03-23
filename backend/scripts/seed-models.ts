@@ -23,6 +23,12 @@ const anthropicModels = [
   "claude-opus-4-6",
 ];
 
+const googleModels = [
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-2.5-pro",
+];
+
 async function seedModels() {
   console.log("Seeding model catalog...");
 
@@ -56,6 +62,18 @@ async function seedModels() {
       .values({
         name: modelName,
         providerId: "anthropic",
+      })
+      .onConflictDoNothing();
+
+    console.log(`- ensured model exists: ${modelName}`);
+  }
+
+  for (const modelName of googleModels) {
+    await db
+      .insert(modelTable)
+      .values({
+        name: modelName,
+        providerId: "google",
       })
       .onConflictDoNothing();
 

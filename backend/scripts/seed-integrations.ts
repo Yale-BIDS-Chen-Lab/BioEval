@@ -24,6 +24,12 @@ const integrations = [
       apiKey: z.string().nonempty(),
     }),
   },
+  {
+    provider: "google",
+    schema: z.object({
+      apiKey: z.string().nonempty(),
+    }),
+  },
 ];
 
 async function seedIntegrations() {

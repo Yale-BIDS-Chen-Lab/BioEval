@@ -775,6 +775,39 @@ const providers = [
     },
     models: ["claude-haiku-4-5", "claude-sonnet-4-6", "claude-opus-4-6"],
   },
+  {
+    provider: {
+      name: "Google Gemini",
+      providerId: "google",
+      parameters: [
+        {
+          id: "max_tokens",
+          name: "Max tokens",
+          description:
+            "Maximum number of tokens returned in the response.",
+          schema: z.toJSONSchema(numeric(1)),
+          defaultValue: 4096,
+        },
+        {
+          id: "temperature",
+          name: "Temperature",
+          description:
+            "Controls randomness; higher values = more diverse, lower = more deterministic.",
+          schema: z.toJSONSchema(numeric(0, 1)),
+          defaultValue: 0.7,
+        },
+        {
+          id: "top_p",
+          name: "Top P",
+          description:
+            "Nucleus sampling: keep the smallest token set whose cumulative prob ≥ P.",
+          schema: z.toJSONSchema(numeric(0, 1)),
+          defaultValue: 0.95,
+        },
+      ],
+    },
+    models: ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"],
+  },
 ];
 
 const integrations = [
@@ -794,6 +827,12 @@ const integrations = [
   },
   {
     provider: "anthropic",
+    schema: z.object({
+      apiKey: z.string().nonempty(),
+    }),
+  },
+  {
+    provider: "google",
     schema: z.object({
       apiKey: z.string().nonempty(),
     }),

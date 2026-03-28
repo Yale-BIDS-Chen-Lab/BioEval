@@ -419,8 +419,8 @@ function RouteComponent() {
                       </div>
                     </div>
                   )}
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
+                  <div className="grid grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] gap-2">
+                    <div className="min-w-0">
                       <label className="font-mono text-xs text-muted-foreground">Test</label>
                       <Select
                         value={testMethod}
@@ -428,7 +428,7 @@ function RouteComponent() {
                           setTestMethod(value)
                         }
                       >
-                        <SelectTrigger className="mt-1 h-8 font-mono text-xs">
+                        <SelectTrigger className="mt-1 h-8 w-full min-w-0 font-mono text-[11px]">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -441,17 +441,17 @@ function RouteComponent() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <label className="font-mono text-xs text-muted-foreground">Sample Size</label>
                       <Input
                         type="number"
                         min={2}
                         value={sampleSize}
                         onChange={(e) => setSampleSize(Number(e.target.value) || 40)}
-                        className="mt-1 h-8 font-mono text-xs"
+                        className="mt-1 h-8 min-w-0 font-mono text-xs"
                       />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <label className="font-mono text-xs text-muted-foreground">Bootstrap N</label>
                       <Input
                         type="number"
@@ -459,7 +459,7 @@ function RouteComponent() {
                         step={100}
                         value={nBoot}
                         onChange={(e) => setNBoot(Number(e.target.value) || 1000)}
-                        className="mt-1 h-8 font-mono text-xs"
+                        className="mt-1 h-8 min-w-0 font-mono text-xs"
                       />
                     </div>
                   </div>

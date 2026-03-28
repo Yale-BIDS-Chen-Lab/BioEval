@@ -43,6 +43,12 @@ const formatMetricName = (metric: string): string => {
     'f1': 'F1',
     'precision': 'Precision',
     'recall': 'Recall',
+    'llm_judge_correctness': 'LLM Judge Correctness',
+    'llm_judge_completeness': 'LLM Judge Completeness',
+    'llm_judge_relevance': 'LLM Judge Relevance',
+    'human_evaluation': 'Human Evaluation',
+    'human_evaluation_mean': 'Human Score (Avg)',
+    'human_evaluation_count': 'Rated Rows',
   };
   
   return metricMap[metric.toLowerCase()] || metric;
@@ -491,11 +497,13 @@ function RouteComponent() {
                         <div className="text-xs font-medium truncate mb-1" title={model}>{model}</div>
                         <div className="space-y-1">
                           {Object.entries(metrics).map(([metric, stats]: [string, any]) => (
-                            <div key={metric} className="flex items-center justify-between">
-                              <span className="font-mono text-xs text-muted-foreground">{formatMetricName(metric)}</span>
-                              <span className="font-mono text-xs">
+                            <div key={metric} className="rounded-sm border border-border/60 bg-muted/10 px-2 py-1.5">
+                              <div className="font-mono text-xs text-muted-foreground break-words">
+                                {formatMetricName(metric)}
+                              </div>
+                              <div className="mt-1 font-mono text-xs break-all">
                                 {stats.mean.toFixed(4)} [{stats.ci_low.toFixed(4)}, {stats.ci_high.toFixed(4)}]
-                              </span>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -515,9 +523,11 @@ function RouteComponent() {
                       <div className="space-y-2">
                         {statsResult.pairwise.map((t: any, i: number) => (
                           <div key={i} className="rounded border p-2 space-y-1">
-                            <div className="flex items-center justify-between">
-                              <span className="font-mono text-xs font-medium">{formatMetricName(t.metric)}</span>
-                              <span className={`font-mono text-xs font-semibold ${t.p_value < 0.05 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                            <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                              <span className="font-mono text-xs font-medium break-words">
+                                {formatMetricName(t.metric)}
+                              </span>
+                              <span className={`font-mono text-xs font-semibold sm:text-right ${t.p_value < 0.05 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                                 p={t.p_value < 0.001 ? t.p_value.toExponential(2) : t.p_value.toFixed(4)}
                               </span>
                             </div>

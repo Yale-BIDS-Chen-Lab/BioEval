@@ -12,7 +12,7 @@ Supports inference via **Azure OpenAI** and **HuggingFace** (local GPU), with 12
 | Requirement | Notes |
 |---|---|
 | [Docker Desktop](https://www.docker.com/products/docker-desktop/) (macOS) or [Docker Engine](https://docs.docker.com/engine/install/) + [Compose plugin](https://docs.docker.com/compose/install/) (Linux) | Required for the supported platforms below |
-| NVIDIA GPU + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) | Required only for local HuggingFace inference (**Linux only**). Azure OpenAI works without a GPU. |
+| NVIDIA GPU + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) | Required only for local NVIDIA GPU inference (**Linux only**). Cloud providers (Azure OpenAI, Google Gemini, Anthropic) work without a GPU. |
 
 ---
 
@@ -31,20 +31,21 @@ Open **http://localhost:3000**, create an account, and add an integration under 
 
 ## Platform Notes
 
-### macOS
+### macOS (Cloud API Only)
 
 1. Install [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/).
-2. For the default all-Docker setup, use the **Azure OpenAI** integration for inference. If you want local HuggingFace inference on Apple GPU, use the **macOS With Local HuggingFace on Apple GPU (MPS)** path below instead.
+2. This setup uses cloud providers (Azure OpenAI, Google Gemini, Anthropic) for inference — no GPU required. If you want local inference on Apple GPU instead, use the **macOS with Local Inference on Apple GPU (MPS)** path below.
 3. Open **Terminal**:
    ```bash
    cd docker-files
+   cp .env.example .env
    docker compose up --build
    ```
 4. Open **http://localhost:3000** in your browser.
 
-### macOS With Local HuggingFace on Apple GPU (MPS)
+### macOS with Local Inference on Apple GPU (MPS)
 
-Use this path if you want BioEval to keep the shared stack in Docker but run `inference-service` natively on your Mac so HuggingFace models can use `mps`.
+Use this path if you want BioEval to keep the shared stack in Docker but run `inference-service` natively on your Mac so local models can use the Apple GPU via `mps`.
 
 Important:
 - Choose **either** the default all-Docker path **or** this MPS path. Do **not** run `docker compose up --build` first and then start the host-native worker, or you will end up with both the Docker `inference` service and the macOS `inference-service` consuming the same RabbitMQ queues.
@@ -81,11 +82,13 @@ Important:
 3. Run:
    ```bash
    cd docker-files
+   cp .env.example .env
    docker compose up --build
    ```
-   For HuggingFace inference with GPU:
+   For local inference with NVIDIA GPU:
    ```bash
    cd docker-files
+   cp .env.example .env
    docker compose -f docker-compose.yml -f docker-compose-gpu.yml up --build
    ```
 4. Open **http://localhost:3000** in your browser.
@@ -116,18 +119,19 @@ docker compose down -v
 
 ## Support
 
-If you run into any issues, please open a GitHub issue and include your environment and logs when possible.
-If you need help extending BioEval with new models, metrics, or benchmark workflows, please email xuguang.ai@outlook.com.
+We welcome bug reports, feature requests, and questions — please [open a GitHub issue](https://github.com/Yale-BIDS-Chen-Lab/BioEval/issues). Including your OS, Docker version, and relevant logs helps us respond faster.
+
+For help extending BioEval with new models, metrics, or benchmark workflows, feel free to email xuguang.ai@outlook.com.
 
 ---
 
 ## Contributing
 
-See [CONTRIBUTING.md](/Users/xai/Desktop/BioEval/CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
 ## License
 
 This project is licensed under **PolyForm Noncommercial 1.0.0**.
-See [LICENSE.md](/Users/xai/Desktop/BioEval/LICENSE.md) or <https://polyformproject.org/licenses/noncommercial/1.0.0/>.
+See [LICENSE.md](LICENSE.md) or <https://polyformproject.org/licenses/noncommercial/1.0.0/>.

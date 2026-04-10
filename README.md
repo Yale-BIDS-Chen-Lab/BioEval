@@ -53,7 +53,12 @@ Open **http://localhost:3000**, create an account, and add an integration under 
 
 ---
 
-## Platform Notes
+## Setup by Platform
+
+- [macOS (Cloud API Only)](#macos-cloud-api-only)
+- [macOS with Local Inference on Apple GPU (MPS)](#macos-with-local-inference-on-apple-gpu-mps)
+- [Linux (Cloud API Only)](#linux-cloud-api-only)
+- [Linux with Local Inference on NVIDIA GPU](#linux-with-local-inference-on-nvidia-gpu)
 
 ### macOS (Cloud API Only)
 

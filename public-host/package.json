@@ -13,7 +13,7 @@
     "dev:backend": "npm --workspace packages/backend run dev"
   },
   "author": "",
-  "license": "ISC",
+  "license": "SEE LICENSE IN LICENSE.md",
   "type": "module",
   "devDependencies": {
     "concurrently": "^9.2.0"

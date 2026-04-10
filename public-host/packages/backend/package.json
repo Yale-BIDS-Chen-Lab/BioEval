@@ -11,7 +11,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "SEE LICENSE IN LICENSE.md",
   "type": "module",
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",

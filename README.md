@@ -57,7 +57,7 @@ Open **http://localhost:3000**, create an account, and add an integration under 
 
 ### macOS (Cloud API Only)
 
-1. Install [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/).
+1. Install and **open** [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/) (the Docker daemon must be running before proceeding).
 2. This setup uses cloud providers (Azure OpenAI, Google Gemini, Anthropic) for inference — no GPU required. If you want local inference on Apple GPU instead, use the **macOS with Local Inference on Apple GPU (MPS)** path below.
 3. Open **Terminal**:
    ```bash
@@ -99,17 +99,22 @@ Important:
    ```
 4. Open **http://localhost:3000** in your browser.
 
-### Linux
+### Linux (Cloud API Only)
 
 1. Install [Docker Engine](https://docs.docker.com/engine/install/) and the [Compose plugin](https://docs.docker.com/compose/install/linux/).
-2. For GPU support, install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
-3. Run:
+2. Run:
    ```bash
    cd docker-files
    cp .env.example .env
    docker compose up --build
    ```
-   For local inference with NVIDIA GPU:
+3. Open **http://localhost:3000** in your browser.
+
+### Linux with Local Inference on NVIDIA GPU
+
+1. Install [Docker Engine](https://docs.docker.com/engine/install/) and the [Compose plugin](https://docs.docker.com/compose/install/linux/).
+2. Install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+3. Run:
    ```bash
    cd docker-files
    cp .env.example .env

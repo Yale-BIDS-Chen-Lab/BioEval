@@ -5,7 +5,6 @@
 <p>Benchmark LLMs on medical NLP — from setup to statistical comparison, in one platform.</p>
 
 <a href="https://github.com/Yale-BIDS-Chen-Lab/BioEval/blob/main/LICENSE.md"><img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial-blue" alt="License" /></a>
-<a href="https://github.com/Yale-BIDS-Chen-Lab/BioEval/stargazers"><img src="https://img.shields.io/github/stars/Yale-BIDS-Chen-Lab/BioEval" alt="Stars" /></a>
 
 </div>
 

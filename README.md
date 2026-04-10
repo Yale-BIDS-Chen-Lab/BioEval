@@ -1,9 +1,34 @@
-# BioEval
+<div align="center">
 
-A web platform for benchmarking LLMs on biomedical NLP tasks.  
-Supports inference via **Azure OpenAI** and **HuggingFace** (local GPU), with 12 built-in public benchmarks and the ability to **upload your own datasets**. Covers tasks including text generation, multiple-choice QA, named entity recognition, single-label classification, and multi-label classification.
+<h1>BioEval</h1>
 
-![BioEval Overview](docs/overview.png)
+<p>Benchmark LLMs on medical NLP — from setup to statistical comparison, in one platform.</p>
+
+<a href="https://github.com/Yale-BIDS-Chen-Lab/BioEval/blob/main/LICENSE.md"><img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial-blue" alt="License" /></a>
+<a href="https://github.com/Yale-BIDS-Chen-Lab/BioEval/stargazers"><img src="https://img.shields.io/github/stars/Yale-BIDS-Chen-Lab/BioEval" alt="Stars" /></a>
+
+</div>
+
+<br />
+
+Evaluating LLMs on medical tasks usually means writing one-off scripts, wrangling provider APIs, and losing track of results across spreadsheets. BioEval is a self-hosted web platform that handles prompt engineering, inference, postprocessing & evaluation, head-to-head comparison, and statistical analysis in one place.
+
+### 📊 Built-in Benchmarks
+12 curated medical datasets covering QA, NER, relation extraction, classification, and summarization — including PubMedQA, MedQA, BC5CDR, and ChemProt.
+
+### 🔀 One Workspace for the Entire Workflow
+Configure prompts, run inference across Azure OpenAI, Google Gemini, Anthropic, and local GPU models, auto-evaluate with 10+ metrics, and compare results side by side with statistical significance tests — all without leaving the browser.
+
+### 📁 Bring Your Own Benchmark
+Upload custom datasets and evaluate them with the same pipeline and metrics.
+
+<div align="center">
+  <h4>Benchmark Dashboard</h4>
+  <img src="docs/screenshot-inferences.png" width="800" alt="Benchmark Dashboard" />
+  <br /><br />
+  <h4>Head-to-Head Comparison & Statistical Analysis</h4>
+  <img src="docs/screenshot-evaluation.png" width="800" alt="Head-to-Head Comparison and Statistical Analysis" />
+</div>
 
 ---
 

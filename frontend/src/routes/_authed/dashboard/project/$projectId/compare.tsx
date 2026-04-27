@@ -15,6 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 // Helper function to format metric names for display
 const formatMetricName = (metric: string): string => {
@@ -531,9 +536,23 @@ function RouteComponent() {
                                 p={t.p_value < 0.001 ? t.p_value.toExponential(2) : t.p_value.toFixed(4)}
                               </span>
                             </div>
-                            <div className="text-xs text-muted-foreground truncate" title={`${t.modelA} vs ${t.modelB}`}>
-                              {t.modelA} vs {t.modelB}
-                            </div>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="text-xs text-muted-foreground truncate text-left w-full cursor-pointer hover:text-foreground transition-colors"
+                                  title={`${t.modelA} vs ${t.modelB}`}
+                                >
+                                  {t.modelA} vs {t.modelB}
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                align="start"
+                                className="w-auto max-w-md font-mono text-xs break-all"
+                              >
+                                {t.modelA} vs {t.modelB}
+                              </PopoverContent>
+                            </Popover>
                           </div>
                         ))}
                       </div>

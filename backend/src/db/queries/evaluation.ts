@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, lt, sql } from "drizzle-orm";
 import { db } from "..";
 import { dataset, evaluation, inference, NewEvaluation, provider, task } from "../schema";
 import {
@@ -10,6 +10,24 @@ let evaluationHasCreatedAtColumn: boolean | null = null;
 
 export async function createEvaluation(newEvaluation: NewEvaluation) {
   return db.insert(evaluation).values(newEvaluation);
+}
+
+export async function markEvaluationFailed(evaluationId: string) {
+  return db
+    .update(evaluation)
+    .set({ status: "failed" })
+    .where(eq(evaluation.evaluationId, evaluationId));
+}
+
+export async function getStalePendingEvaluationIds(
+  olderThanSeconds: number
+): Promise<string[]> {
+  const cutoff = sql`NOW() - (${olderThanSeconds}::int * INTERVAL '1 second')`;
+  const rows = await db
+    .select({ evaluationId: evaluation.evaluationId })
+    .from(evaluation)
+    .where(and(eq(evaluation.status, "pending"), lt(evaluation.createdAt, cutoff)));
+  return rows.map((r) => r.evaluationId);
 }
 
 // TODO: rewrite

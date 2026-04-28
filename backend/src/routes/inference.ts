@@ -14,7 +14,6 @@ import {
   getInferenceObject,
   getProjectInferences,
   inferenceExists,
-  markInferenceFailed,
   toggleFavoriteInference,
 } from "../db/queries/inference";
 import { deleteEvaluationsByInference, getInferenceEvaluations, getEvaluationObject } from "../db/queries/evaluation";
@@ -375,9 +374,6 @@ router.post(
           .json({ success: false, error: "Dataset doesn't exist" });
       }
 
-      // Phase 1: validate ALL models before any DB write to avoid partial commits.
-      const dataset = await getDatasetObject(req.body.datasetId, req.user.id);
-      const validatedModels: NewInference[] = [];
       for (const modelQuery of req.body.models) {
         const validProvider = await providerExists(modelQuery.provider);
         if (!validProvider) {
@@ -442,58 +438,26 @@ router.post(
           }
         }
 
-        validatedModels.push({
+        const dataset = await getDatasetObject(req.body.datasetId, req.user.id);
+        const inferenceId = randomId(6);
+        const newInference: NewInference = {
           userId: req.user.id,
           projectId: req.body.projectId,
           taskId: dataset.taskId,
           datasetId: req.body.datasetId,
-          inferenceId: randomId(6),
+          inferenceId,
           prompt: req.body.prompt,
           model: modelQuery.model,
           status: "pending",
           parameters: modelQuery.parameters,
           providerId: modelQuery.provider,
-        });
-      }
+        };
 
-      // Phase 2: persist + publish. Insert is committed before publish; if publish
-      // fails the row is marked 'failed' so the user sees it instead of a silent
-      // stuck-pending. The startup sweep will retry rows that survive a process crash.
-      const created: string[] = [];
-      const publishFailures: { inferenceId: string; error: string }[] = [];
-      for (const newInference of validatedModels) {
         await createInference(newInference);
-        try {
-          await rmqClient.sendInference(newInference.inferenceId);
-          created.push(newInference.inferenceId);
-        } catch (err: any) {
-          const message = err?.message ?? String(err);
-          console.error(
-            `failed to publish inference ${newInference.inferenceId}: ${message}`
-          );
-          await markInferenceFailed(newInference.inferenceId).catch((dbErr) =>
-            console.error(
-              `also failed to mark ${newInference.inferenceId} as failed:`,
-              dbErr
-            )
-          );
-          publishFailures.push({
-            inferenceId: newInference.inferenceId,
-            error: message,
-          });
-        }
+        await rmqClient.sendInference(inferenceId);
       }
 
-      if (publishFailures.length > 0) {
-        return res.status(StatusCodes.BAD_GATEWAY).json({
-          success: false,
-          error: "Some inferences could not be queued.",
-          created,
-          failed: publishFailures,
-        });
-      }
-
-      res.json({ success: true, message: "Created inference.", created });
+      res.json({ success: true, message: "Created inference." });
     },
     "body"
   )
@@ -1401,25 +1365,7 @@ router.post(
       };
 
       await createInference(newInference);
-      try {
-        await rmqClient.sendInference(newInferenceId);
-      } catch (err: any) {
-        const message = err?.message ?? String(err);
-        console.error(
-          `failed to publish inference ${newInferenceId}: ${message}`
-        );
-        await markInferenceFailed(newInferenceId).catch((dbErr) =>
-          console.error(
-            `also failed to mark ${newInferenceId} as failed:`,
-            dbErr
-          )
-        );
-        return res.status(StatusCodes.BAD_GATEWAY).json({
-          success: false,
-          inferenceId: newInferenceId,
-          error: `Inference was created but could not be queued: ${message}`,
-        });
-      }
+      await rmqClient.sendInference(newInferenceId);
 
       return res.json({ success: true, inferenceId: newInferenceId });
     },

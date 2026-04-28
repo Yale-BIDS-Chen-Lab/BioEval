@@ -1,4 +1,4 @@
-import { and, eq, lt, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "..";
 import { dataset, inference, NewInference, provider, task } from "../schema";
 
@@ -6,24 +6,6 @@ let inferenceHasCreatedAtColumn: boolean | null = null;
 
 export async function createInference(newProject: NewInference) {
   return db.insert(inference).values(newProject);
-}
-
-export async function markInferenceFailed(inferenceId: string) {
-  return db
-    .update(inference)
-    .set({ status: "failed" })
-    .where(eq(inference.inferenceId, inferenceId));
-}
-
-export async function getStalePendingInferenceIds(
-  olderThanSeconds: number
-): Promise<string[]> {
-  const cutoff = sql`NOW() - (${olderThanSeconds}::int * INTERVAL '1 second')`;
-  const rows = await db
-    .select({ inferenceId: inference.inferenceId })
-    .from(inference)
-    .where(and(eq(inference.status, "pending"), lt(inference.createdAt, cutoff)));
-  return rows.map((r) => r.inferenceId);
 }
 
 // FIXME: optimize query

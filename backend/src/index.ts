@@ -5,10 +5,6 @@ import * as express from "express";
 import apiRouter from "./routes/api";
 import { auth } from "./utils/auth";
 import { rmqClient } from "./rabbitmq/client";
-import { getStalePendingInferenceIds } from "./db/queries/inference";
-import { getStalePendingEvaluationIds } from "./db/queries/evaluation";
-
-const STALE_PENDING_THRESHOLD_SECONDS = 60;
 
 const app = express();
 app.set("query parser", "extended");
@@ -49,54 +45,8 @@ app.use(express.json());
 
 app.use("/api", apiRouter);
 
-// Re-publish jobs that were committed to the DB but never reached RabbitMQ
-// (e.g. backend crashed between insert and publish). Consumers are idempotent
-// (they short-circuit on status != 'pending'), so re-publishing is safe.
-// If the DB is older than the current schema and lacks createdAt, we log and
-// skip rather than failing startup.
-async function sweepStalePending(): Promise<void> {
-  try {
-    const inferenceIds = await getStalePendingInferenceIds(
-      STALE_PENDING_THRESHOLD_SECONDS
-    );
-    for (const id of inferenceIds) {
-      try {
-        await rmqClient.sendInference(id);
-        console.log(`[sweep] re-queued stale inference ${id}`);
-      } catch (err: any) {
-        console.error(
-          `[sweep] failed to re-queue inference ${id}: ${err?.message ?? err}`
-        );
-      }
-    }
-
-    const evaluationIds = await getStalePendingEvaluationIds(
-      STALE_PENDING_THRESHOLD_SECONDS
-    );
-    for (const id of evaluationIds) {
-      try {
-        await rmqClient.sendEvaluation(id);
-        console.log(`[sweep] re-queued stale evaluation ${id}`);
-      } catch (err: any) {
-        console.error(
-          `[sweep] failed to re-queue evaluation ${id}: ${err?.message ?? err}`
-        );
-      }
-    }
-
-    if (inferenceIds.length === 0 && evaluationIds.length === 0) {
-      console.log("[sweep] no stale pending jobs found");
-    }
-  } catch (err: any) {
-    console.warn(
-      `[sweep] skipped: ${err?.message ?? err} (jobs may need manual retry)`
-    );
-  }
-}
-
 async function startServer() {
   await rmqClient.connect();
-  await sweepStalePending();
 
   app.listen(PORT, () => {
     console.log("Running on port", PORT);

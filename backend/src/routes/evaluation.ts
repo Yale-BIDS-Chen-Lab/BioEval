@@ -5,7 +5,6 @@ import {
   deleteEvaluation,
   getEvaluationObject,
   getInferenceEvaluations,
-  markEvaluationFailed,
 } from "../db/queries/evaluation";
 import {
   getCompletedInferences,
@@ -147,25 +146,7 @@ router.post(
       };
 
       await createEvaluation(newEvaluation);
-      try {
-        await rmqClient.sendEvaluation(evaluationId);
-      } catch (err: any) {
-        const message = err?.message ?? String(err);
-        console.error(
-          `failed to publish evaluation ${evaluationId}: ${message}`
-        );
-        await markEvaluationFailed(evaluationId).catch((dbErr) =>
-          console.error(
-            `also failed to mark ${evaluationId} as failed:`,
-            dbErr
-          )
-        );
-        return res.status(StatusCodes.BAD_GATEWAY).json({
-          success: false,
-          evaluationId,
-          error: `Evaluation was created but could not be queued: ${message}`,
-        });
-      }
+      await rmqClient.sendEvaluation(evaluationId);
 
       res.json({ success: true, message: "Created evaluations." });
     },

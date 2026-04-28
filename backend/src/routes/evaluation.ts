@@ -146,7 +146,7 @@ router.post(
       };
 
       await createEvaluation(newEvaluation);
-      await rmqClient.sendEvaluation(evaluationId);
+      rmqClient.sendEvaluation(evaluationId);
 
       res.json({ success: true, message: "Created evaluations." });
     },

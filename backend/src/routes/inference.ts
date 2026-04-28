@@ -454,7 +454,7 @@ router.post(
         };
 
         await createInference(newInference);
-        rmqClient.sendInference(inferenceId);
+        await rmqClient.sendInference(inferenceId);
       }
 
       res.json({ success: true, message: "Created inference." });
@@ -1365,7 +1365,7 @@ router.post(
       };
 
       await createInference(newInference);
-      rmqClient.sendInference(newInferenceId);
+      await rmqClient.sendInference(newInferenceId);
 
       return res.json({ success: true, inferenceId: newInferenceId });
     },

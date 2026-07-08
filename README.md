@@ -46,10 +46,16 @@ Upload custom datasets and evaluate them with the same pipeline and metrics.
 git clone https://github.com/Yale-BIDS-Chen-Lab/BioEval.git
 cd BioEval/docker-files
 cp .env.example .env
+# Set a real auth secret before exposing the app beyond your own machine:
+#   openssl rand -base64 32   # paste the output into BETTER_AUTH_SECRET in .env
 docker compose up --build
 ```
 
 Open **http://localhost:3000**, create an account, and add an integration under **Settings**.
+
+> BioEval runs as a production build (no hot reload). `.env.example` boots as-is
+> for a local trial, but replace the secrets in `.env` before any shared or remote
+> deployment — see [docs/PRODUCTION.md](docs/PRODUCTION.md).
 
 ---
 
@@ -59,6 +65,8 @@ Open **http://localhost:3000**, create an account, and add an integration under 
 - [macOS with Local Inference on Apple GPU (MPS)](#macos-with-local-inference-on-apple-gpu-mps)
 - [Linux (Cloud API Only)](#linux-cloud-api-only)
 - [Linux with Local Inference on NVIDIA GPU](#linux-with-local-inference-on-nvidia-gpu)
+
+> All paths run the production build. `.env.example` boots locally as-is; set a real `BETTER_AUTH_SECRET` in `.env` (`openssl rand -base64 32`) before any shared or remote deployment.
 
 ### macOS (Cloud API Only)
 

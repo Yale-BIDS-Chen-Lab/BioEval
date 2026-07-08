@@ -46,16 +46,20 @@ Upload custom datasets and evaluate them with the same pipeline and metrics.
 git clone https://github.com/Yale-BIDS-Chen-Lab/BioEval.git
 cd BioEval/docker-files
 cp .env.example .env
-# Set a real auth secret before exposing the app beyond your own machine:
-#   openssl rand -base64 32   # paste the output into BETTER_AUTH_SECRET in .env
-docker compose up --build
+docker compose up --build          # first build takes a few minutes; add -d to run in background
 ```
 
-Open **http://localhost:3000**, create an account, and add an integration under **Settings**.
+Open **http://localhost:3000**, create an account, and add an integration (Azure OpenAI / Google Gemini / Anthropic API key) under **Settings**.
 
-> BioEval runs as a production build (no hot reload). `.env.example` boots as-is
-> for a local trial, but replace the secrets in `.env` before any shared or remote
-> deployment — see [docs/PRODUCTION.md](docs/PRODUCTION.md).
+`.env.example` ships working `localhost` defaults, so the command above boots as-is for local use. It runs the **production build** (compiled, no hot reload).
+
+**Before any shared or remote deployment**, edit `.env` and replace the secrets — at minimum `BETTER_AUTH_SECRET`. The backend **refuses to start** if it is missing, shorter than 16 characters, or left as the old dev default, so if you reused an existing `.env` and the backend won't come up, set a fresh secret:
+
+```bash
+openssl rand -base64 32            # paste the output into BETTER_AUTH_SECRET in .env
+```
+
+Also set real `POSTGRES_PASSWORD` / `RABBITMQ_PASSWORD` / `MINIO_ROOT_PASSWORD`, and point `FRONTEND_URL` / `VITE_BACKEND_URL` at your real origin. See [docs/PRODUCTION.md](docs/PRODUCTION.md) for the full checklist.
 
 ---
 
@@ -137,14 +141,16 @@ Important:
 
 ---
 
-## Stopping & Resetting
+## Managing the Stack
+
+Run these from the `docker-files/` directory:
 
 ```bash
-# Stop all services
-docker compose down
-
-# Stop and delete all data (database, model outputs, datasets)
-docker compose down -v
+docker compose ps              # service status and health
+docker compose logs -f backend # follow a service's logs (backend / frontend / inference / migrate)
+docker compose up -d --build   # rebuild and (re)start after pulling changes
+docker compose down            # stop all services
+docker compose down -v         # stop and delete all data (database, model outputs, datasets)
 ```
 
 ## Support

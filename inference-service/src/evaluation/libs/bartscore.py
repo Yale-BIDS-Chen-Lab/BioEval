@@ -72,10 +72,13 @@ class BARTScorer:
           score_list += curr_score_list
 
       except RuntimeError:
+        # Re-raise instead of exit(0): killing the whole worker process on one
+        # bad batch takes down every queued job. The caller (bartscore metric)
+        # catches this, retries on CPU, and finally zero-fills.
         traceback.print_exc()
         print(f"source: {src_list}")
         print(f"target: {tgt_list}")
-        exit(0)
+        raise
     return score_list
 
   def multi_ref_score(self, srcs, tgts: List[List[str]], agg="mean", batch_size=4):

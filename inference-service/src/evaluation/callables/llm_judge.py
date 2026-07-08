@@ -1,8 +1,29 @@
+import re
 from typing import Any, Callable, Dict
 from numpy.typing import NDArray
 
 def is_gpt5_family(model: str) -> bool:
     return model.lower().startswith("gpt-5")
+
+
+def parse_judge_score(text: str | None, scale: float) -> float | None:
+    """Extract a numeric rating from a judge reply, clamped to [1, scale].
+
+    Judges frequently wrap the number in prose ("Rating: 4/5"), and reasoning
+    models can return empty/None content, so we take the first number rather than
+    float() the whole string. Returns None when no number is found so callers can
+    fall back instead of raising and failing the entire evaluation.
+    """
+    if not text:
+        return None
+    match = re.search(r"[-+]?\d*\.?\d+", text)
+    if not match:
+        return None
+    try:
+        value = float(match.group())
+    except ValueError:
+        return None
+    return max(1.0, min(float(scale), value))
 
 
 def get_reasoning_effort_options(model: str) -> set[str]:
@@ -78,8 +99,14 @@ def llm_judge_metric(
                     max_tokens=max_tokens,
                 )
             
-            score_text = response.choices[0].message.content.strip()
-            score = float(score_text)
+            content = response.choices[0].message.content
+            score = parse_judge_score(content, scale)
+            if score is None:
+                print(
+                    f"[llm_judge:{criterion}] could not parse a numeric score from "
+                    f"response {content!r}; falling back to 1.0"
+                )
+                score = 1.0
             scores.append(score)
 
         return scores

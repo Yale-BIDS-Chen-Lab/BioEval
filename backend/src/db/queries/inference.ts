@@ -8,6 +8,13 @@ export async function createInference(newProject: NewInference) {
   return db.insert(inference).values(newProject);
 }
 
+export async function markInferenceFailed(inferenceId: string) {
+  return db
+    .update(inference)
+    .set({ status: "failed" })
+    .where(eq(inference.inferenceId, inferenceId));
+}
+
 // FIXME: optimize query
 export async function getProjectInferences(projectId: string) {
   if (inferenceHasCreatedAtColumn !== false) {

@@ -12,6 +12,13 @@ export async function createEvaluation(newEvaluation: NewEvaluation) {
   return db.insert(evaluation).values(newEvaluation);
 }
 
+export async function markEvaluationFailed(evaluationId: string) {
+  return db
+    .update(evaluation)
+    .set({ status: "failed" })
+    .where(eq(evaluation.evaluationId, evaluationId));
+}
+
 // TODO: rewrite
 export async function getProjectEvaluations(projectId: string) {
   const evaluations = await db

@@ -5,10 +5,16 @@ import * as express from "express";
 import apiRouter from "./routes/api";
 import { auth } from "./utils/auth";
 import { rmqClient } from "./rabbitmq/client";
+import { validateProductionConfig } from "./utils/config";
+
+// Fail fast on unsafe production config (e.g. the dev-default auth secret).
+// No-op unless NODE_ENV=production, so local/dev is unaffected.
+validateProductionConfig();
 
 const app = express();
 app.set("query parser", "extended");
-// Required when behind tunnel proxy: backend must trust Host and X-Forwarded-Proto so cookies and redirects use the public URL
+// Trust the first proxy hop (Host / X-Forwarded-Proto) when running behind a
+// reverse proxy, so cookies and redirects use the external URL.
 app.set("trust proxy", 1);
 
 const PORT = process.env.PORT || 3000;
@@ -25,13 +31,17 @@ app.use(
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
-      if (origin.endsWith(".trycloudflare.com")) return callback(null, true);
       callback(new Error("Not allowed by CORS"));
     },
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
+
+// Unauthenticated liveness probe (used by container healthchecks).
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
 
 // Log auth activity (sign-in/sign-up attempts from public domain)
 app.use("/api/auth", (req, _res, next) => {

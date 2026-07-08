@@ -24,7 +24,6 @@ export default defineConfig({
   server: {
     host: true,
     port: 3000,
-    // Allow Cloudflare Tunnel and other proxy hosts (e.g. trycloudflare.com)
-    allowedHosts: [".trycloudflare.com", "localhost"],
+    allowedHosts: ["localhost"],
   },
 });

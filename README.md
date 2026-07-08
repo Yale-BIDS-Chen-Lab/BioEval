@@ -129,18 +129,6 @@ Important:
 
 ---
 
-## Remote Server Access
-
-If BioEval is running on a remote Linux server, forward the ports over SSH:
-
-```bash
-ssh -L 3000:localhost:3000 -L 3001:localhost:3001 user@your-server-ip
-```
-
-Then open **http://localhost:3000** in your local browser.
-
----
-
 ## Stopping & Resetting
 
 ```bash

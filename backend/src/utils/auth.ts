@@ -9,7 +9,6 @@ export const auth = betterAuth({
   trustedOrigins: [
     process.env.FRONTEND_URL!,
     ...(process.env.ADDITIONAL_ORIGINS?.split(",").map((o) => o.trim()) ?? []),
-    "https://*.trycloudflare.com", // any Cloudflare Tunnel URL; no need to add each URL to ADDITIONAL_ORIGINS
     "http://localhost:3000",
     "http://127.0.0.1:3000",
   ].filter(Boolean),

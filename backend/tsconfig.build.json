@@ -1,4 +1,11 @@
 {
+  // Production build config. rootDir=src so `src/index.ts` emits to
+  // `dist/index.js` (what `start:dist` runs). scripts/ and drizzle.config.ts
+  // are intentionally not compiled — they run via ts-node.
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+  "compilerOptions": {
+    "rootDir": "./src"
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/*.spec.ts"]
 }

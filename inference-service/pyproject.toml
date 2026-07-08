@@ -25,3 +25,10 @@ dependencies = [
     "types-boto3[essential]>=1.38.38",
 ]
 requires-python = ">=3.10"
+
+# Tests run with the stdlib runner (no install needed):
+#   .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
+# scipy/numpy (used by src/statistics) are pulled in transitively via
+# scikit-learn/torch and are pinned in uv.lock.
+[tool.pytest.ini_options]
+testpaths = ["tests"]

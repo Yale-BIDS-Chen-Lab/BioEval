@@ -43,6 +43,7 @@ import {
   upsertHumanScore,
 } from "../db/queries/human-score";
 import type { EvaluationCardPieces } from "../services/evaluation-card";
+import { buildEvaluationCard } from "../services/evaluation-card";
 
 const router = express.Router();
 
@@ -428,6 +429,41 @@ router.get(
       }
       const { meta, aggregate, records } = assembled.pieces;
       return res.json({ success: true, records, aggregate, meta });
+    },
+    "query"
+  )
+);
+
+router.get(
+  "/card",
+  ...validatedRoute(
+    dataviewSchema,
+    async (req, res) => {
+      const assembled = await assembleEvaluationCard(
+        req.query.evaluationId,
+        req.user.id
+      );
+      if (assembled.status === "not-found") {
+        return res
+          .status(StatusCodes.NOT_FOUND)
+          .json({ success: false, error: "Evaluation doesn't exist" });
+      }
+      if (assembled.status === "not-ready") {
+        return res.status(StatusCodes.CONFLICT).json({
+          success: false,
+          error: "Evaluation is not complete; cannot export a card yet",
+        });
+      }
+      const card = buildEvaluationCard(
+        assembled.pieces,
+        new Date().toISOString()
+      );
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="evaluation-card-${req.query.evaluationId}.json"`
+      );
+      return res.status(StatusCodes.OK).send(JSON.stringify(card, null, 2));
     },
     "query"
   )

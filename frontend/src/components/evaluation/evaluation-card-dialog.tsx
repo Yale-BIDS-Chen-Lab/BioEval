@@ -65,30 +65,27 @@ export function downloadCardJson(card: any, evaluationId: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Presentational — two type sizes only: text-sm for primary values,
-// text-xs (muted) for secondary detail. Mono is reserved for literal config.
+// Presentational — one regular definition grid. Type variants kept minimal:
+// xs muted for labels, sm for values, mono only for literal config (prompt,
+// decoding params). Every row uses the same <Field>.
 // ---------------------------------------------------------------------------
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="space-y-1.5">
-      <h3 className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">
-        {title}
-      </h3>
-      {children}
-    </section>
-  );
-}
-
-function Placeholder({ children }: { children: ReactNode }) {
-  return (
-    <span className="text-muted-foreground/70 text-sm italic">{children}</span>
-  );
-}
 
 function formatParamValue(value: unknown) {
   if (value === null || value === undefined) return "—";
   return typeof value === "object" ? JSON.stringify(value) : String(value);
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <>
+      <dt className="text-muted-foreground pt-px text-xs">{label}</dt>
+      <dd className="min-w-0 text-sm">{children}</dd>
+    </>
+  );
+}
+
+function Dash() {
+  return <span className="text-muted-foreground">—</span>;
 }
 
 export function CardBody({ card }: { card: any }) {
@@ -105,7 +102,6 @@ export function CardBody({ card }: { card: any }) {
     ? card.evaluation.parsingFunctions
     : [];
   const judge = card.evaluation?.llmJudge;
-  // Only show judge configs for metrics actually enabled on this evaluation.
   const judgeEntries =
     judge && typeof judge === "object"
       ? Object.entries(judge).filter(
@@ -115,87 +111,66 @@ export function CardBody({ card }: { card: any }) {
       : [];
 
   return (
-    <>
-      <Section title="Dataset registration">
-        <p className="text-sm font-medium">{card.dataset?.name ?? "—"}</p>
-        <p className="text-muted-foreground text-xs leading-relaxed">
-          {card.dataset?.task?.name ?? "—"} · canonical{" "}
-          {"{id, input, reference}"} schema
-        </p>
-        <p className="text-muted-foreground text-xs leading-relaxed">
-          Label set:{" "}
-          {classes.length > 0 ? (
-            <span className="text-foreground">{classes.join(", ")}</span>
-          ) : (
-            <span className="italic">none (unlabeled task)</span>
-          )}
-        </p>
-      </Section>
+    <dl className="grid grid-cols-[92px_1fr] items-baseline gap-x-4 gap-y-3">
+      <Field label="Dataset">
+        <span className="font-medium">{card.dataset?.name ?? "—"}</span>
+        {card.dataset?.task?.name && (
+          <span className="text-muted-foreground">
+            {" "}
+            · {card.dataset.task.name}
+          </span>
+        )}
+      </Field>
 
-      <Section title="Prompt">
+      <Field label="Label set">
+        {classes.length > 0 ? classes.join(", ") : <Dash />}
+      </Field>
+
+      <Field label="Prompt">
         {card.prompt?.template ? (
-          <pre className="bg-muted/60 text-foreground max-h-48 overflow-auto rounded-md border p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap">
+          <pre className="bg-muted/60 max-h-40 overflow-auto rounded-md p-2.5 font-mono text-xs leading-relaxed whitespace-pre-wrap">
             {card.prompt.template}
           </pre>
         ) : (
-          <Placeholder>No prompt template recorded.</Placeholder>
+          <Dash />
         )}
-      </Section>
+      </Field>
 
-      <Section title="Model">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium">
-            {card.model?.identifier ?? "—"}
-          </span>
-          {card.model?.provider && (
-            <Badge variant="outline" className="font-normal">
-              {card.model.provider}
-            </Badge>
-          )}
-        </div>
-      </Section>
+      <Field label="Model">
+        {card.model?.identifier ?? "—"}
+        {card.model?.provider && (
+          <span className="text-muted-foreground"> ({card.model.provider})</span>
+        )}
+      </Field>
 
-      <Section title="Decoding parameters">
+      <Field label="Parameters">
         {params.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1">
             {params.map((p: any) => (
               <span
                 key={p.id}
-                className="bg-muted rounded px-2 py-0.5 font-mono text-xs"
+                className="bg-muted rounded px-1.5 py-0.5 font-mono text-xs"
               >
                 {p.id} = {formatParamValue(p.value)}
               </span>
             ))}
           </div>
         ) : (
-          <Placeholder>Provider defaults (none specified).</Placeholder>
+          <Dash />
         )}
-      </Section>
+      </Field>
 
-      <Section title="Postprocessing">
+      <Field label="Postprocess">
         {parsing.length > 0 ? (
-          <ul className="space-y-1">
-            {parsing.map((f: any, i: number) => (
-              <li key={f.id ?? i} className="text-sm leading-relaxed">
-                <span className="font-mono text-xs">{f.id ?? "parser"}</span>
-                {Array.isArray(f.arguments) && f.arguments.length > 0 && (
-                  <span className="text-muted-foreground text-xs">
-                    {" "}
-                    · {f.arguments.length} arg
-                    {f.arguments.length > 1 ? "s" : ""}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
+          parsing.map((f: any) => f.id ?? "parser").join(", ")
         ) : (
-          <Placeholder>None — raw outputs are scored as-is.</Placeholder>
+          <Dash />
         )}
-      </Section>
+      </Field>
 
-      <Section title="Metrics">
+      <Field label="Metrics">
         {metrics.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1">
             {metrics.map((m) => (
               <Badge key={m} variant="secondary">
                 {m}
@@ -203,35 +178,25 @@ export function CardBody({ card }: { card: any }) {
             ))}
           </div>
         ) : (
-          <Placeholder>None specified.</Placeholder>
+          <Dash />
         )}
-      </Section>
+      </Field>
 
-      <Section title="LLM-as-judge">
+      <Field label="LLM judge">
         {judgeEntries.length > 0 ? (
-          <ul className="space-y-1">
+          <div className="space-y-0.5">
             {judgeEntries.map(([metricId, cfg]: [string, any]) => (
-              <li key={metricId} className="text-sm leading-relaxed">
-                <span className="font-mono text-xs">{metricId}</span>
-                <span className="text-muted-foreground text-xs">
-                  {" "}
-                  · {cfg.model ?? "—"}
-                  {cfg.scale ? ` · scale ${cfg.scale}` : ""}
-                </span>
-              </li>
+              <div key={metricId}>
+                {metricId}: {cfg.model ?? "—"}
+                {cfg.scale ? ` · scale ${cfg.scale}` : ""}
+              </div>
             ))}
-          </ul>
+          </div>
         ) : (
-          <Placeholder>Not used.</Placeholder>
+          <Dash />
         )}
-      </Section>
-
-      <p className="text-muted-foreground/70 border-t pt-3 text-xs leading-relaxed">
-        Statistics and output artifacts (raw / postprocessed outputs, per-example
-        scores, annotations) are recorded with the comparison and the results
-        export — not in this recipe card.
-      </p>
-    </>
+      </Field>
+    </dl>
   );
 }
 
@@ -290,7 +255,7 @@ export function EvaluationCardDialog({
           </p>
         </DialogHeader>
 
-        <div className="max-h-[60vh] space-y-5 overflow-y-auto px-6 py-5">
+        <div className="max-h-[60vh] overflow-y-auto px-6 py-5">
           <EvaluationCardSections
             card={card}
             isLoading={isLoading}

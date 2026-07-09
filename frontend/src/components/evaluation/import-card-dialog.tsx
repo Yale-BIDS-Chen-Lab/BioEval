@@ -134,8 +134,7 @@ export function ImportCardDialog({
         <DialogHeader className="space-y-1 border-b px-6 py-4 text-left">
           <DialogTitle>Import evaluation card</DialogTitle>
           <p className="text-muted-foreground text-sm">
-            Paste or upload a card JSON to recreate its inference + evaluation
-            and run it.
+            Upload a card JSON to recreate its inference + evaluation and run it.
           </p>
         </DialogHeader>
 
@@ -152,15 +151,7 @@ export function ImportCardDialog({
                 <Upload className="h-4 w-4" /> Upload .json
               </span>
             </label>
-            <span className="text-muted-foreground text-xs">or paste below</span>
           </div>
-
-          <textarea
-            value={rawText}
-            onChange={(e) => setRawText(e.target.value)}
-            placeholder='{ "bioeval": { … }, "dataset": { … }, … }'
-            className="border-input h-28 w-full rounded-md border p-2 font-mono text-xs"
-          />
 
           {parsed && "error" in parsed && (
             <p className="text-destructive text-sm">{parsed.error}</p>

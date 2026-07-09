@@ -15,6 +15,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useEffect, useMemo, useRef, useState } from "react";
 import TextareaAutosize from "react-textarea-autosize";
+import { toast } from "sonner";
 import { Cell, DataTable } from "../dataview-table/table";
 
 type EditNotePayload = {
@@ -436,18 +437,24 @@ export function DataView({
   });
 
   const download = async () => {
-    const res = await axios.get("api/evaluation/card", {
-      params: { evaluationId },
-      withCredentials: true,
-    });
-    const a = document.createElement("a");
-    const file = new Blob([JSON.stringify(res.data, null, 2)], {
-      type: "application/json",
-    });
-    a.href = URL.createObjectURL(file);
-    a.download = `evaluation-card-${evaluationId}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    try {
+      const res = await axios.get("api/evaluation/card", {
+        params: { evaluationId },
+        withCredentials: true,
+      });
+      const a = document.createElement("a");
+      const file = new Blob([JSON.stringify(res.data, null, 2)], {
+        type: "application/json",
+      });
+      a.href = URL.createObjectURL(file);
+      a.download = `evaluation-card-${evaluationId}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.error ?? "Failed to export the evaluation card."
+      );
+    }
   };
 
   const metricColumns = useMemo<ColumnDef<any>[]>(

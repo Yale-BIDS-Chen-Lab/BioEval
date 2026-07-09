@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { InferenceEvaluationSummary } from "@/components/project/inference-evaluation-summary";
+import { InferenceEvaluationCardButton } from "@/components/evaluation/inference-evaluation-card-dialog";
 
 function formatCreatedAt(value: string | null | undefined) {
   if (!value) return "-";
@@ -362,6 +363,19 @@ export const columns: ColumnDef<Inference>[] = [
   },
   {
     id: "actions",
-    cell: ({ row }) => <DataTableRowActions row={row} />,
+    cell: ({ row }) => {
+      const { projectId } = useParams({
+        from: "/_authed/dashboard/project/$projectId/",
+      });
+      return (
+        <div className="flex items-center justify-end gap-0.5">
+          <InferenceEvaluationCardButton
+            inferenceId={row.original.inferenceId}
+            projectId={projectId}
+          />
+          <DataTableRowActions row={row} />
+        </div>
+      );
+    },
   },
 ];

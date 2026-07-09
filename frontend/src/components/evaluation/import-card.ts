@@ -32,15 +32,23 @@ export function parseCard(
   }
   if (!obj || typeof obj !== "object")
     return { error: "This is not a valid evaluation card." };
-  if (!obj.dataset?.name || !obj.dataset?.task?.id)
+  if (
+    typeof obj.dataset?.name !== "string" ||
+    typeof obj.dataset?.task?.id !== "string" ||
+    typeof obj.dataset?.task?.name !== "string"
+  )
     return { error: "Card is missing the dataset name or task." };
-  if (!obj.prompt?.template)
+  if (typeof obj.prompt?.template !== "string")
     return { error: "Card is missing the prompt template." };
-  if (!obj.model?.identifier || !obj.model?.provider)
+  if (
+    typeof obj.model?.identifier !== "string" ||
+    typeof obj.model?.provider !== "string"
+  )
     return { error: "Card is missing the model identifier or provider." };
   if (
     !Array.isArray(obj.evaluation?.metrics) ||
-    obj.evaluation.metrics.length === 0
+    obj.evaluation.metrics.length === 0 ||
+    !obj.evaluation.metrics.every((m: unknown) => typeof m === "string")
   )
     return { error: "Card has no evaluation metrics." };
   return { card: obj as ImportCard };

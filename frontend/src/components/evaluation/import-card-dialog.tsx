@@ -37,6 +37,7 @@ export function ImportCardDialog({
   const queryClient = useQueryClient();
   const [rawText, setRawText] = useState("");
   const [isImporting, setIsImporting] = useState(false);
+  const [partialFailure, setPartialFailure] = useState(false);
 
   const parsed = useMemo(
     () => (rawText.trim() ? parseCard(rawText) : null),
@@ -44,7 +45,11 @@ export function ImportCardDialog({
   );
   const card = parsed && "card" in parsed ? parsed.card : null;
 
-  const { data: datasetsData } = useQuery({
+  const {
+    data: datasetsData,
+    isLoading: datasetsLoading,
+    isError: datasetsError,
+  } = useQuery({
     queryKey: ["datasets"],
     enabled: open,
     queryFn: async () =>
@@ -56,6 +61,7 @@ export function ImportCardDialog({
   const reset = () => {
     setRawText("");
     setIsImporting(false);
+    setPartialFailure(false);
   };
   const handleOpenChange = (next: boolean) => {
     onOpenChange(next);
@@ -96,11 +102,15 @@ export function ImportCardDialog({
         queryClient.invalidateQueries({ queryKey: ["inferences", projectId] });
         handleOpenChange(false);
       } catch (evalErr: any) {
+        // Non-atomic path: the inference exists but its evaluation failed.
+        // Block re-import (would create a duplicate inference); the user
+        // resolves it from the dashboard.
+        setPartialFailure(true);
         queryClient.invalidateQueries({ queryKey: ["inferences", projectId] });
         toast.error(
           `The inference was created, but its evaluation failed: ${
             evalErr?.response?.data?.error ?? "unknown error"
-          }. Add it from the dashboard or delete the inference.`
+          }.`
         );
       }
     } catch (infErr: any) {
@@ -161,7 +171,15 @@ export function ImportCardDialog({
               <div className="rounded-md border p-4">
                 <CardBody card={card} />
               </div>
-              {matched ? (
+              {datasetsLoading ? (
+                <p className="text-muted-foreground text-sm">
+                  Checking your datasets…
+                </p>
+              ) : datasetsError ? (
+                <p className="text-destructive text-sm">
+                  Couldn't load your datasets — reopen the dialog and try again.
+                </p>
+              ) : matched ? (
                 <p className="text-sm">
                   Will use your dataset{" "}
                   <span className="font-medium">{matched.name}</span> (
@@ -175,15 +193,32 @@ export function ImportCardDialog({
               )}
             </>
           )}
+
+          {partialFailure && (
+            <p className="text-destructive text-sm">
+              The inference was created but its evaluation failed. Add the
+              evaluation from the dashboard, or delete the inference.
+            </p>
+          )}
         </div>
 
         <DialogFooter className="border-t px-6 py-4">
-          <Button variant="outline" onClick={() => handleOpenChange(false)}>
+          <Button
+            variant="outline"
+            onClick={() => handleOpenChange(false)}
+            disabled={isImporting}
+          >
             Cancel
           </Button>
           <Button
             onClick={handleImport}
-            disabled={!card || !matched || isImporting}
+            disabled={
+              !card ||
+              !matched ||
+              isImporting ||
+              datasetsLoading ||
+              partialFailure
+            }
           >
             {isImporting ? "Importing…" : "Import & run"}
           </Button>

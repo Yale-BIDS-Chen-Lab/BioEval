@@ -42,17 +42,17 @@ import {
   getHumanScores,
   upsertHumanScore,
 } from "../db/queries/human-score";
-import type { EvaluationCardPieces } from "../services/evaluation-card";
-import { buildEvaluationCard } from "../services/evaluation-card";
+import type { RunPieces } from "../services/evaluation-results";
+import { buildEvaluationResults } from "../services/evaluation-results";
 
 const router = express.Router();
 
 type AssembleResult =
   | { status: "not-found" }
   | { status: "not-ready" }
-  | { status: "ok"; pieces: EvaluationCardPieces };
+  | { status: "ok"; pieces: RunPieces };
 
-async function assembleEvaluationCard(
+async function assembleRunData(
   evaluationId: string,
   userId: string
 ): Promise<AssembleResult> {
@@ -415,7 +415,7 @@ router.get(
   ...validatedRoute(
     dataviewSchema,
     async (req, res) => {
-      const assembled = await assembleEvaluationCard(
+      const assembled = await assembleRunData(
         req.query.evaluationId,
         req.user.id
       );
@@ -435,11 +435,11 @@ router.get(
 );
 
 router.get(
-  "/card",
+  "/results",
   ...validatedRoute(
     dataviewSchema,
     async (req, res) => {
-      const assembled = await assembleEvaluationCard(
+      const assembled = await assembleRunData(
         req.query.evaluationId,
         req.user.id
       );
@@ -451,19 +451,19 @@ router.get(
       if (assembled.status === "not-ready") {
         return res.status(StatusCodes.CONFLICT).json({
           success: false,
-          error: "Evaluation is not complete; cannot export a card yet",
+          error: "Evaluation is not complete; cannot export results yet",
         });
       }
-      const card = buildEvaluationCard(
+      const results = buildEvaluationResults(
         assembled.pieces,
         new Date().toISOString()
       );
       res.setHeader("Content-Type", "application/json");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="evaluation-card-${req.query.evaluationId}.json"`
+        `attachment; filename="evaluation-results-${req.query.evaluationId}.json"`
       );
-      return res.status(StatusCodes.OK).send(JSON.stringify(card, null, 2));
+      return res.status(StatusCodes.OK).send(JSON.stringify(results, null, 2));
     },
     "query"
   )

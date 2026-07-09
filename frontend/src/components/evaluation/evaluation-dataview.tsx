@@ -438,7 +438,7 @@ export function DataView({
 
   const download = async () => {
     try {
-      const res = await axios.get("api/evaluation/card", {
+      const res = await axios.get("api/evaluation/results", {
         params: { evaluationId },
         withCredentials: true,
       });
@@ -447,7 +447,7 @@ export function DataView({
         type: "application/json",
       });
       a.href = URL.createObjectURL(file);
-      a.download = `evaluation-card-${evaluationId}.json`;
+      a.download = `evaluation-results-${evaluationId}.json`;
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (err: any) {
@@ -671,7 +671,7 @@ export function DataView({
               onClick={download}
             >
               <Download className="h-4 w-4" />
-              Export evaluation card
+              Export results
             </Button>
           </div>
         </div>

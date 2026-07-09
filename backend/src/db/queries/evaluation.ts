@@ -132,6 +132,7 @@ export async function getEvaluationObject(
       parsingFunctions: evaluation.parsingFunctions,
       llmJudgeConfig: evaluation.llmJudgeConfig,
       datasetClasses: dataset.classes,
+      datasetDefaultPrompt: dataset.defaultPrompt,
     })
     .from(evaluation)
     .innerJoin(inference, eq(inference.inferenceId, evaluation.inferenceId))

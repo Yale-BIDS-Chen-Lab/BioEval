@@ -185,7 +185,6 @@ async function assembleRunData(
 
 type RecipeResult =
   | { status: "not-found" }
-  | { status: "not-ready" }
   | { status: "ok"; pieces: EvaluationCardRecipePieces };
 
 async function assembleEvaluationCardRecipe(
@@ -194,47 +193,25 @@ async function assembleEvaluationCardRecipe(
 ): Promise<RecipeResult> {
   const ev = await getEvaluationObject(evaluationId, userId);
   if (!ev) return { status: "not-found" };
-  if (ev.status !== "done" || !ev.datasetObjectKey) {
-    return { status: "not-ready" };
-  }
-
-  const s3conn = await new S3Connection().connect();
-  try {
-    s3conn.createTable("dataset", ev.datasetObjectKey);
-    const res = await s3conn.con.runAndReadAll(
-      `SELECT id, input, reference FROM dataset`
-    );
-    const rows = res.getRowObjectsJson() as {
-      id: string;
-      input: string;
-      reference: string;
-    }[];
-
-    return {
-      status: "ok",
-      pieces: {
-        status: ev.status,
+  return {
+    status: "ok",
+    pieces: {
+      dataset: {
+        id: ev.datasetId,
+        name: ev.datasetName,
         task: { id: ev.taskId, name: ev.taskName },
-        dataset: {
-          name: ev.datasetName,
-          defaultPrompt: ev.datasetDefaultPrompt,
-          classes: ev.datasetClasses ?? null,
-          rows,
-        },
-        prompt: ev.prompt,
-        model: {
-          provider: ev.providerId,
-          identifier: ev.modelName,
-          parameters: ev.parameters,
-        },
-        metrics: ev.metrics,
-        parsingFunctions: ev.parsingFunctions ?? null,
-        llmJudgeConfig: ev.llmJudgeConfig ?? null,
       },
-    };
-  } finally {
-    await s3conn.dispose();
-  }
+      prompt: ev.prompt,
+      model: {
+        provider: ev.providerId,
+        identifier: ev.modelName,
+        parameters: ev.parameters,
+      },
+      metrics: ev.metrics,
+      parsingFunctions: ev.parsingFunctions ?? null,
+      llmJudgeConfig: ev.llmJudgeConfig ?? null,
+    },
+  };
 }
 
 async function getEvaluationRowIds(evaluationObjectKey: string) {
@@ -538,12 +515,6 @@ router.get(
         return res
           .status(StatusCodes.NOT_FOUND)
           .json({ success: false, error: "Evaluation doesn't exist" });
-      }
-      if (assembled.status === "not-ready") {
-        return res.status(StatusCodes.CONFLICT).json({
-          success: false,
-          error: "Evaluation is not complete; cannot export a card yet",
-        });
       }
       const card = buildEvaluationCard(
         assembled.pieces,

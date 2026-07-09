@@ -1,7 +1,7 @@
 "use client";
 
 import { type Row } from "@tanstack/react-table";
-import { MoreHorizontal, Trash2, Copy, Star, XCircle } from "lucide-react";
+import { MoreHorizontal, Trash2, Copy, Star, XCircle, FileText } from "lucide-react";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { axios } from "@/lib/axios";
+import { EvaluationCardDialog } from "@/components/evaluation/evaluation-card-dialog";
 
 interface DataTableRowActionsProps<TData> {
   row: Row<TData>;
@@ -35,6 +36,7 @@ export function DataTableRowActions<TData>({
   type = "inference",
 }: DataTableRowActionsProps<TData>) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showCardDialog, setShowCardDialog] = useState(false);
   const queryClient = useQueryClient();
 
   const inferenceId = (row.original as any).inferenceId;
@@ -169,6 +171,15 @@ export function DataTableRowActions<TData>({
               {cancelMutation.isPending ? "Canceling..." : "Cancel"}
             </DropdownMenuItem>
           )}
+          {isEvaluation && (
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => setShowCardDialog(true)}
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Evaluation card
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             className="text-destructive focus:text-destructive cursor-pointer"
             onClick={() => setShowDeleteDialog(true)}
@@ -179,6 +190,14 @@ export function DataTableRowActions<TData>({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {isEvaluation && (
+        <EvaluationCardDialog
+          evaluationId={evaluationId}
+          open={showCardDialog}
+          onOpenChange={setShowCardDialog}
+        />
+      )}
 
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent className="sm:max-w-[480px] p-6 sm:p-8">

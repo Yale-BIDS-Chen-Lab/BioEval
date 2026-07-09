@@ -41,6 +41,7 @@ export function EvaluationCardDialog({
   const { data: card, isLoading, isError } = useQuery({
     queryKey: ["evaluation-card", evaluationId],
     enabled: open,
+    retry: false,
     queryFn: async () => {
       try {
         const res = await axios.get("api/evaluation/card", {
@@ -132,14 +133,26 @@ export function EvaluationCardDialog({
                       .join(", ")}
                   </div>
                 )}
-              {card.evaluation?.llmJudge && (
-                <div className="text-muted-foreground mt-1 text-xs">
-                  LLM judge: {card.evaluation.llmJudge.model ?? "—"}
-                  {card.evaluation.llmJudge.scale
-                    ? ` · scale ${card.evaluation.llmJudge.scale}`
-                    : ""}
-                </div>
-              )}
+              {(() => {
+                const judge = card.evaluation?.llmJudge;
+                const entries =
+                  judge && typeof judge === "object"
+                    ? Object.entries(judge).filter(
+                        ([, cfg]) => cfg && typeof cfg === "object"
+                      )
+                    : [];
+                if (entries.length === 0) return null;
+                return (
+                  <div className="text-muted-foreground mt-1 space-y-0.5 text-xs">
+                    {entries.map(([metricId, cfg]: [string, any]) => (
+                      <div key={metricId}>
+                        LLM judge ({metricId}): {cfg.model ?? "—"}
+                        {cfg.scale ? ` · scale ${cfg.scale}` : ""}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </Row>
           </div>
         )}

@@ -85,7 +85,7 @@ function InferenceList() {
   const canCompare = selectedCount >= 2;
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <OverallModelRanking inferences={inferences} />
       <DataTable
         data={inferences}

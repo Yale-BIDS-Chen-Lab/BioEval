@@ -226,7 +226,7 @@ export const columns: ColumnDef<Inference>[] = [
       const model = row.getValue("model") as string;
       return (
         <div className="flex space-x-2">
-          <div className="flex max-w-[360px] flex-row items-center gap-2 truncate font-medium">
+          <div className="flex max-w-[240px] flex-row items-center gap-2 truncate font-medium">
             <img
               src={`/logos/${provider}.svg`}
               alt="Provider logo"
@@ -350,12 +350,18 @@ export const columns: ColumnDef<Inference>[] = [
       });
 
       return (
-        <InferenceEvaluationSummary
-          inferenceId={row.original.inferenceId}
-          projectId={projectId}
-          taskName={row.original.task ?? ""}
-          summary={row.original.evaluationSummary}
-        />
+        <div className="flex items-center gap-2">
+          <InferenceEvaluationSummary
+            inferenceId={row.original.inferenceId}
+            projectId={projectId}
+            taskName={row.original.task ?? ""}
+            summary={row.original.evaluationSummary}
+          />
+          <InferenceEvaluationCardButton
+            inferenceId={row.original.inferenceId}
+            projectId={projectId}
+          />
+        </div>
       );
     },
     enableSorting: false,
@@ -363,19 +369,6 @@ export const columns: ColumnDef<Inference>[] = [
   },
   {
     id: "actions",
-    cell: ({ row }) => {
-      const { projectId } = useParams({
-        from: "/_authed/dashboard/project/$projectId/",
-      });
-      return (
-        <div className="flex items-center justify-end gap-0.5">
-          <InferenceEvaluationCardButton
-            inferenceId={row.original.inferenceId}
-            projectId={projectId}
-          />
-          <DataTableRowActions row={row} />
-        </div>
-      );
-    },
+    cell: ({ row }) => <DataTableRowActions row={row} />,
   },
 ];

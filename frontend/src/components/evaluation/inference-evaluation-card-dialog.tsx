@@ -206,13 +206,13 @@ export function InferenceEvaluationCardButton({
   return (
     <>
       <Button
-        variant="ghost"
-        className="h-8 w-8 p-0"
+        variant="outline"
         title="Evaluation card"
         onClick={() => setOpen(true)}
+        className="flex h-[64px] w-[68px] shrink-0 flex-col items-center justify-center gap-1 p-0"
       >
         <FileText className="h-4 w-4" />
-        <span className="sr-only">Evaluation card</span>
+        <span className="text-[11px] font-medium leading-none">Card</span>
       </Button>
       <InferenceEvaluationCardDialog
         inferenceId={inferenceId}

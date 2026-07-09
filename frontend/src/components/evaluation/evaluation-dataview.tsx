@@ -435,14 +435,19 @@ export function DataView({
     },
   });
 
-  const download = () => {
+  const download = async () => {
+    const res = await axios.get("api/evaluation/card", {
+      params: { evaluationId },
+      withCredentials: true,
+    });
     const a = document.createElement("a");
-    const file = new Blob([JSON.stringify(data, null, 2)], {
+    const file = new Blob([JSON.stringify(res.data, null, 2)], {
       type: "application/json",
     });
     a.href = URL.createObjectURL(file);
-    a.download = "export.json";
+    a.download = `evaluation-card-${evaluationId}.json`;
     a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   const metricColumns = useMemo<ColumnDef<any>[]>(
@@ -659,6 +664,7 @@ export function DataView({
               onClick={download}
             >
               <Download className="h-4 w-4" />
+              Export evaluation card
             </Button>
           </div>
         </div>

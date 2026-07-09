@@ -452,6 +452,27 @@ export function DataView({
       URL.revokeObjectURL(a.href);
     } catch (err: any) {
       toast.error(
+        err?.response?.data?.error ?? "Failed to export results."
+      );
+    }
+  };
+
+  const downloadCard = async () => {
+    try {
+      const res = await axios.get("api/evaluation/card", {
+        params: { evaluationId },
+        withCredentials: true,
+      });
+      const a = document.createElement("a");
+      const file = new Blob([JSON.stringify(res.data, null, 2)], {
+        type: "application/json",
+      });
+      a.href = URL.createObjectURL(file);
+      a.download = `evaluation-card-${evaluationId}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (err: any) {
+      toast.error(
         err?.response?.data?.error ?? "Failed to export the evaluation card."
       );
     }
@@ -672,6 +693,15 @@ export function DataView({
             >
               <Download className="h-4 w-4" />
               Export results
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="cursor-pointer"
+              onClick={downloadCard}
+            >
+              <Download className="h-4 w-4" />
+              Export evaluation card
             </Button>
           </div>
         </div>

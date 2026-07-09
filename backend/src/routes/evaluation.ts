@@ -44,6 +44,8 @@ import {
 } from "../db/queries/human-score";
 import type { RunPieces } from "../services/evaluation-results";
 import { buildEvaluationResults } from "../services/evaluation-results";
+import type { EvaluationCardRecipePieces } from "../services/evaluation-card";
+import { buildEvaluationCard } from "../services/evaluation-card";
 
 const router = express.Router();
 
@@ -174,6 +176,60 @@ async function assembleRunData(
         parsingFunctions: evaluation.parsingFunctions ?? null,
         llmJudgeConfig: evaluation.llmJudgeConfig ?? null,
         datasetClasses: evaluation.datasetClasses ?? null,
+      },
+    };
+  } finally {
+    await s3conn.dispose();
+  }
+}
+
+type RecipeResult =
+  | { status: "not-found" }
+  | { status: "not-ready" }
+  | { status: "ok"; pieces: EvaluationCardRecipePieces };
+
+async function assembleEvaluationCardRecipe(
+  evaluationId: string,
+  userId: string
+): Promise<RecipeResult> {
+  const ev = await getEvaluationObject(evaluationId, userId);
+  if (!ev) return { status: "not-found" };
+  if (ev.status !== "done" || !ev.datasetObjectKey) {
+    return { status: "not-ready" };
+  }
+
+  const s3conn = await new S3Connection().connect();
+  try {
+    s3conn.createTable("dataset", ev.datasetObjectKey);
+    const res = await s3conn.con.runAndReadAll(
+      `SELECT id, input, reference FROM dataset`
+    );
+    const rows = res.getRowObjectsJson() as {
+      id: string;
+      input: string;
+      reference: string;
+    }[];
+
+    return {
+      status: "ok",
+      pieces: {
+        status: ev.status,
+        task: { id: ev.taskId, name: ev.taskName },
+        dataset: {
+          name: ev.datasetName,
+          defaultPrompt: ev.datasetDefaultPrompt,
+          classes: ev.datasetClasses ?? null,
+          rows,
+        },
+        prompt: ev.prompt,
+        model: {
+          provider: ev.providerId,
+          identifier: ev.modelName,
+          parameters: ev.parameters,
+        },
+        metrics: ev.metrics,
+        parsingFunctions: ev.parsingFunctions ?? null,
+        llmJudgeConfig: ev.llmJudgeConfig ?? null,
       },
     };
   } finally {
@@ -464,6 +520,41 @@ router.get(
         `attachment; filename="evaluation-results-${req.query.evaluationId}.json"`
       );
       return res.status(StatusCodes.OK).send(JSON.stringify(results, null, 2));
+    },
+    "query"
+  )
+);
+
+router.get(
+  "/card",
+  ...validatedRoute(
+    dataviewSchema,
+    async (req, res) => {
+      const assembled = await assembleEvaluationCardRecipe(
+        req.query.evaluationId,
+        req.user.id
+      );
+      if (assembled.status === "not-found") {
+        return res
+          .status(StatusCodes.NOT_FOUND)
+          .json({ success: false, error: "Evaluation doesn't exist" });
+      }
+      if (assembled.status === "not-ready") {
+        return res.status(StatusCodes.CONFLICT).json({
+          success: false,
+          error: "Evaluation is not complete; cannot export a card yet",
+        });
+      }
+      const card = buildEvaluationCard(
+        assembled.pieces,
+        new Date().toISOString()
+      );
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="evaluation-card-${req.query.evaluationId}.json"`
+      );
+      return res.status(StatusCodes.OK).send(JSON.stringify(card, null, 2));
     },
     "query"
   )

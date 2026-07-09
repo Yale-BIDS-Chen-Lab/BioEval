@@ -1,5 +1,10 @@
 export type EvaluationCardRecipePieces = {
-  dataset: { id: string; name: string; task: { id: string; name: string } };
+  dataset: {
+    id: string;
+    name: string;
+    task: { id: string; name: string };
+    classes: unknown | null;
+  };
   prompt: string;
   model: { provider: string; identifier: string; parameters: unknown };
   metrics: unknown;
@@ -9,7 +14,12 @@ export type EvaluationCardRecipePieces = {
 
 export type EvaluationCard = {
   bioeval: { cardVersion: string; exportedAt: string };
-  dataset: { id: string; name: string; task: { id: string; name: string } };
+  dataset: {
+    id: string;
+    name: string;
+    task: { id: string; name: string };
+    classes: unknown | null;
+  };
   prompt: { template: string };
   model: { provider: string; identifier: string; parameters: unknown };
   evaluation: {

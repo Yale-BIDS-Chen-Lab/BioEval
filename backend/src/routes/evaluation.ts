@@ -183,6 +183,22 @@ async function assembleRunData(
   }
 }
 
+// The stored llmJudgeConfig is a map keyed by metric id and may retain configs
+// for judge metrics the user configured but did not enable. The card should
+// carry only the judge configs for metrics actually enabled on this evaluation.
+function judgeConfigForMetrics(
+  llmJudgeConfig: unknown,
+  metrics: unknown
+): unknown | null {
+  if (!llmJudgeConfig || typeof llmJudgeConfig !== "object") return null;
+  const enabled = Array.isArray(metrics) ? metrics : [];
+  const filtered: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(llmJudgeConfig)) {
+    if (enabled.includes(key)) filtered[key] = value;
+  }
+  return Object.keys(filtered).length > 0 ? filtered : null;
+}
+
 type RecipeResult =
   | { status: "not-found" }
   | { status: "ok"; pieces: EvaluationCardRecipePieces };
@@ -200,6 +216,7 @@ async function assembleEvaluationCardRecipe(
         id: ev.datasetId,
         name: ev.datasetName,
         task: { id: ev.taskId, name: ev.taskName },
+        classes: ev.datasetClasses ?? null,
       },
       prompt: ev.prompt,
       model: {
@@ -209,7 +226,7 @@ async function assembleEvaluationCardRecipe(
       },
       metrics: ev.metrics,
       parsingFunctions: ev.parsingFunctions ?? null,
-      llmJudgeConfig: ev.llmJudgeConfig ?? null,
+      llmJudgeConfig: judgeConfigForMetrics(ev.llmJudgeConfig, ev.metrics),
     },
   };
 }

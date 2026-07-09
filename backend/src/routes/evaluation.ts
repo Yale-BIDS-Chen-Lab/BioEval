@@ -42,8 +42,143 @@ import {
   getHumanScores,
   upsertHumanScore,
 } from "../db/queries/human-score";
+import type { EvaluationCardPieces } from "../services/evaluation-card";
 
 const router = express.Router();
+
+type AssembleResult =
+  | { status: "not-found" }
+  | { status: "not-ready" }
+  | { status: "ok"; pieces: EvaluationCardPieces };
+
+async function assembleEvaluationCard(
+  evaluationId: string,
+  userId: string
+): Promise<AssembleResult> {
+  const evaluation = await getEvaluationObject(evaluationId, userId);
+  if (!evaluation) return { status: "not-found" };
+  if (
+    evaluation.status !== "done" ||
+    !evaluation.evaluationObjectKey ||
+    !evaluation.inferenceObjectKey
+  ) {
+    return { status: "not-ready" };
+  }
+
+  const s3conn = await new S3Connection().connect();
+  try {
+    s3conn.createTable("dataset", evaluation.datasetObjectKey);
+    s3conn.createTable("inference", evaluation.inferenceObjectKey);
+    s3conn.createTable("evaluation", evaluation.evaluationObjectKey);
+
+    const result = await s3conn.con.runAndReadAll(`
+      SELECT *
+      FROM dataset
+      JOIN inference ON dataset.id = inference.id
+      JOIN (
+        SELECT
+          unnest(evaluation.rows).id as id,
+          unnest(evaluation.rows).metrics as metrics,
+          unnest(evaluation.rows).parsed as parsed,
+          unnest(evaluation.rows).parsedVector as parsedVector,
+          unnest(evaluation.rows).referenceVector as referenceVector
+        FROM evaluation
+      ) as unnested ON dataset.id = unnested.id
+    `);
+
+    const aggregateResult = await s3conn.con.runAndReadAll(`
+      SELECT aggregate FROM evaluation
+    `);
+    const aggregateRow = aggregateResult.getRowObjectsJS()[0];
+    const aggregate: Record<string, unknown> = aggregateRow?.aggregate
+      ? (aggregateRow.aggregate as { key: string; value: any }[]).reduce<
+          Record<string, unknown>
+        >((acc, { key, value }) => {
+          acc[key] = value;
+          return acc;
+        }, {})
+      : {};
+
+    const humanScores = await getHumanScores(evaluationId);
+    const hasHumanEvaluation = Array.isArray(evaluation.metrics)
+      ? evaluation.metrics.includes("human_evaluation")
+      : false;
+    if (hasHumanEvaluation) {
+      const humanAggregate = await getHumanScoreAggregate(evaluationId);
+      if (humanAggregate.human_evaluation_mean !== null) {
+        aggregate.human_evaluation_mean = humanAggregate.human_evaluation_mean;
+      }
+      aggregate.human_evaluation_count = humanAggregate.human_evaluation_count;
+    }
+
+    const effectiveStatus = await getEffectiveEvaluationStatus({
+      evaluationId,
+      metrics: evaluation.metrics,
+      status: evaluation.status as
+        | "pending"
+        | "processing"
+        | "done"
+        | "failed"
+        | "canceled",
+      totalExamples: evaluation.totalExamples ?? evaluation.processedExamples ?? 0,
+    });
+
+    const notesByRowId = await getNotes(evaluation.inferenceId);
+    // DuckDB disambiguates duplicate column names (e.g. id from dataset, inference, unnested) as id, id:1, id:2. Drop the duplicates.
+    const records = result
+      .getRowObjectsJson()
+      .map((record: Record<string, unknown>) => {
+        const out: Record<string, unknown> = { ...record };
+        for (const key of Object.keys(out)) {
+          if (/^id:\d+$/.test(key)) delete out[key];
+        }
+        out.input = evaluation.prompt.replaceAll(
+          "{{input}}",
+          record.input as string
+        );
+        out.notes = notesByRowId[(record.id as string) ?? ""] ?? "";
+        out.humanScore = humanScores[(record.id as string) ?? ""] ?? null;
+        return out;
+      });
+
+    const meta = {
+      model: evaluation.modelName,
+      provider: { id: evaluation.providerId, name: evaluation.providerName },
+      status: effectiveStatus.status,
+      dataset: { id: evaluation.datasetId, name: evaluation.datasetName },
+      task: { id: evaluation.taskId, name: evaluation.taskName },
+      prompt: evaluation.prompt,
+      evaluationMetrics: evaluation.metrics,
+      parameters: evaluation.parameters,
+      totalExamples: evaluation.totalExamples,
+      processedExamples: evaluation.processedExamples,
+      humanEvaluationProgress: hasHumanEvaluation
+        ? {
+            ratedRows: effectiveStatus.ratedRows,
+            totalRows: effectiveStatus.totalRows,
+          }
+        : null,
+    };
+
+    return {
+      status: "ok",
+      pieces: {
+        evaluationId,
+        inferenceId: evaluation.inferenceId,
+        datasetId: evaluation.datasetId,
+        status: evaluation.status,
+        meta,
+        aggregate,
+        records,
+        parsingFunctions: evaluation.parsingFunctions ?? null,
+        llmJudgeConfig: evaluation.llmJudgeConfig ?? null,
+        datasetClasses: evaluation.datasetClasses ?? null,
+      },
+    };
+  } finally {
+    await s3conn.dispose();
+  }
+}
 
 async function getEvaluationRowIds(evaluationObjectKey: string) {
   const s3conn = await new S3Connection().connect();
@@ -279,124 +414,19 @@ router.get(
   ...validatedRoute(
     dataviewSchema,
     async (req, res) => {
-      const evaluation = await getEvaluationObject(
+      const assembled = await assembleEvaluationCard(
         req.query.evaluationId,
         req.user.id
       );
-      if (!evaluation) {
+      if (assembled.status === "not-found") {
         return res
           .status(StatusCodes.NOT_FOUND)
           .json({ success: false, error: "Evaluation doesn't exist" });
       }
-      if (
-        evaluation.status !== "done" ||
-        !evaluation.evaluationObjectKey ||
-        !evaluation.inferenceObjectKey
-      ) {
-        return res.json({
-          success: true,
-          records: [],
-        });
+      if (assembled.status === "not-ready") {
+        return res.json({ success: true, records: [] });
       }
-
-      let s3conn = await new S3Connection().connect();
-      s3conn.createTable("dataset", evaluation.datasetObjectKey);
-      s3conn.createTable("inference", evaluation.inferenceObjectKey);
-      s3conn.createTable("evaluation", evaluation.evaluationObjectKey);
-
-      const result = await s3conn.con.runAndReadAll(`
-        SELECT *
-        FROM dataset
-        JOIN inference ON dataset.id = inference.id
-        JOIN (
-          SELECT 
-            unnest(evaluation.rows).id as id, 
-            unnest(evaluation.rows).metrics as metrics,
-            unnest(evaluation.rows).parsed as parsed,
-            unnest(evaluation.rows).parsedVector as parsedVector,
-            unnest(evaluation.rows).referenceVector as referenceVector
-          FROM evaluation
-        ) as unnested ON dataset.id = unnested.id
-      `);
-
-      const aggregateResult = await s3conn.con.runAndReadAll(`
-        SELECT aggregate
-        FROM evaluation  
-      `);
-
-      const aggregateRow = aggregateResult.getRowObjectsJS()[0];
-      const aggregate: Record<string, unknown> = aggregateRow?.aggregate
-        ? (aggregateRow.aggregate as { key: string; value: any }[]).reduce<
-            Record<string, unknown>
-          >((acc, { key, value }) => {
-            acc[key] = value;
-            return acc;
-          }, {})
-        : {};
-
-      const humanScores = await getHumanScores(req.query.evaluationId);
-      const hasHumanEvaluation = Array.isArray(evaluation.metrics)
-        ? evaluation.metrics.includes("human_evaluation")
-        : false;
-
-      if (hasHumanEvaluation) {
-        const humanAggregate = await getHumanScoreAggregate(req.query.evaluationId);
-        if (humanAggregate.human_evaluation_mean !== null) {
-          aggregate.human_evaluation_mean = humanAggregate.human_evaluation_mean;
-        }
-        aggregate.human_evaluation_count = humanAggregate.human_evaluation_count;
-      }
-
-      const effectiveStatus = await getEffectiveEvaluationStatus({
-        evaluationId: req.query.evaluationId,
-        metrics: evaluation.metrics,
-        status: evaluation.status as
-          | "pending"
-          | "processing"
-          | "done"
-          | "failed"
-          | "canceled",
-        totalExamples: evaluation.totalExamples ?? evaluation.processedExamples ?? 0,
-      });
-
-      const notesByRowId = await getNotes(evaluation.inferenceId);
-      // DuckDB disambiguates duplicate column names (e.g. id from dataset, inference, unnested) as id, id:1, id:2. Drop the duplicates.
-      const records = result.getRowObjectsJson().map((record: Record<string, unknown>) => {
-        const out: Record<string, unknown> = { ...record };
-        for (const key of Object.keys(out)) {
-          if (/^id:\d+$/.test(key)) delete out[key];
-        }
-        out.input = evaluation.prompt.replaceAll(
-          "{{input}}",
-          record.input as string
-        );
-        out.notes = notesByRowId[(record.id as string) ?? ""] ?? "";
-        out.humanScore = humanScores[(record.id as string) ?? ""] ?? null;
-        return out;
-      });
-
-      await s3conn.dispose();
-
-      const meta = {
-        model: evaluation.modelName,
-        provider: { id: evaluation.providerId, name: evaluation.providerName },
-        status: effectiveStatus.status,
-        dataset: { id: evaluation.datasetId, name: evaluation.datasetName },
-        task: { id: evaluation.taskId, name: evaluation.taskName },
-        prompt: evaluation.prompt,
-        evaluationMetrics: evaluation.metrics,
-        parameters: evaluation.parameters,
-        totalExamples: evaluation.totalExamples,
-        processedExamples: evaluation.processedExamples,
-        humanEvaluationProgress:
-          hasHumanEvaluation
-            ? {
-                ratedRows: effectiveStatus.ratedRows,
-                totalRows: effectiveStatus.totalRows,
-              }
-            : null,
-      };
-
+      const { meta, aggregate, records } = assembled.pieces;
       return res.json({ success: true, records, aggregate, meta });
     },
     "query"

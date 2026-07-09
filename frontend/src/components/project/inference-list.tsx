@@ -9,9 +9,11 @@ import { DataTable } from "../data-table/data-table";
 import { OverallModelRanking } from "./overall-model-ranking";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
+import { ImportCardDialog } from "@/components/evaluation/import-card-dialog";
 
 function InferenceList() {
   const [selectedRows, setSelectedRows] = useState<Inference[]>([]);
+  const [showImport, setShowImport] = useState(false);
 
   const navigate = useNavigate();
   const { projectId } = useParams({
@@ -96,6 +98,14 @@ function InferenceList() {
         <Button
           className="h-10 cursor-pointer px-4 text-base font-semibold tracking-tight"
           variant={"outline"}
+          onClick={() => setShowImport(true)}
+        >
+          Import card
+        </Button>
+
+        <Button
+          className="h-10 cursor-pointer px-4 text-base font-semibold tracking-tight"
+          variant={"outline"}
           onClick={() =>
             navigate({
               to: "/dashboard/project/$projectId/inference/create",
@@ -130,6 +140,11 @@ function InferenceList() {
         </Button>
         {/* TODO: add model filter input */}
       </DataTable>
+      <ImportCardDialog
+        projectId={projectId}
+        open={showImport}
+        onOpenChange={setShowImport}
+      />
     </div>
   );
 }

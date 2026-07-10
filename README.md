@@ -4,7 +4,7 @@
 
 <p>Benchmark LLMs on medical NLP — from setup to statistical comparison, in one platform.</p>
 
-<a href="https://github.com/Yale-BIDS-Chen-Lab/BioEval/blob/main/LICENSE.md"><img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial-blue" alt="License" /></a>
+<a href="https://github.com/Yale-BIDS-Chen-Lab/BioEval/blob/main/LICENSE.md"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License" /></a>
 
 </div>
 
@@ -169,5 +169,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-This project is licensed under **PolyForm Noncommercial 1.0.0**.
-See [LICENSE.md](LICENSE.md) or <https://polyformproject.org/licenses/noncommercial/1.0.0/>.
+This project is licensed under the **MIT License**.
+See [LICENSE.md](LICENSE.md).

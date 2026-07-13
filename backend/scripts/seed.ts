@@ -35,7 +35,7 @@ const tasks = {
         name: "MedQA",
         localFileName: "medqa_test.json",
         description:
-          "A multiple-choice medical exam QA dataset derived from real medical-licensing exam questions (USMLE-style), explicitly using the 5-option format and evaluated by accuracy. Commonly used to probe reasoning and knowledge under constrained answer formats.",
+          "A multiple-choice medical exam QA dataset derived from real medical-licensing exam questions (USMLE-style), using a 4-option (A/B/C/D) format and evaluated by accuracy. Commonly used to probe reasoning and knowledge under constrained answer formats.",
         defaultPrompt:
           "Your task is to answer medical questions with the provided choices. Only output the answer option (A/B/C/D) as answer.\n\nInput:{{input}}\nOutput:",
       },
